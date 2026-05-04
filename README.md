@@ -478,7 +478,11 @@ SimpleTinyPDF uses the 14 standard PDF Type 1 fonts. These fonts are built into 
 
 If your project requires custom fonts or broad Unicode support, consider a full-featured PDF library such as QuestPDF, iTextSharp, or PdfSharp.
 
+## Development Notes
 
+This library was written as an exploration of what my increasingly good friend Claude could acomplish.  I continue to be amazed at what generative AI can do.
+
+Sample image assets in the tests project are taken from https://www.publicdomainpictures.net/
 
 ## License
 
