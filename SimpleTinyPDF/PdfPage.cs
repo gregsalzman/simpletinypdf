@@ -107,6 +107,19 @@ namespace SimpleTinyPDF
 
         private static string F(float v) => v.ToString("0.####", CultureInfo.InvariantCulture);
 
+        private void AppendRotation(float angleDegrees, float pdfOriginX, float pdfOriginY)
+        {
+            if (Math.Abs(angleDegrees) < 0.001f) return;
+            // Negate: user positive = clockwise, PDF positive = counter-clockwise
+            float radians = -angleDegrees * (float)Math.PI / 180f;
+            float cos = (float)Math.Cos(radians);
+            float sin = (float)Math.Sin(radians);
+            // Translate-rotate-translate for rotation around arbitrary point
+            _content.AppendFormat("1 0 0 1 {0} {1} cm\n", F(pdfOriginX), F(pdfOriginY));
+            _content.AppendFormat("{0} {1} {2} {3} 0 0 cm\n", F(cos), F(sin), F(-sin), F(cos));
+            _content.AppendFormat("1 0 0 1 {0} {1} cm\n", F(-pdfOriginX), F(-pdfOriginY));
+        }
+
         private void AppendColorFill(PdfColor color)
         {
             if (color.IsCmyk)
@@ -148,7 +161,7 @@ namespace SimpleTinyPDF
             PdfFont font = PdfFont.Helvetica, float fontSize = 12f,
             PdfColor? color = null, TextAlignment alignment = TextAlignment.Left,
             bool underline = false, float opacity = 1f,
-            string link = null)
+            string link = null, float rotation = 0f)
         {
             if (string.IsNullOrEmpty(text)) return;
             var c = color ?? PdfColor.Black;
@@ -164,6 +177,7 @@ namespace SimpleTinyPDF
 
             _content.Append("q\n");
             AppendOpacity(opacity);
+            AppendRotation(rotation, x, pdfY);
             _content.Append("BT\n");
             _content.AppendFormat("/{0} {1} Tf\n", fontId, F(fontSize));
             AppendColorFill(c);
@@ -181,7 +195,7 @@ namespace SimpleTinyPDF
         /// Each TextSpan can have its own font, font size, and color.
         /// </summary>
         public void DrawRichText(IEnumerable<TextSpan> spans, float x, float y,
-            TextAlignment alignment = TextAlignment.Left)
+            TextAlignment alignment = TextAlignment.Left, float rotation = 0f)
         {
             if (spans == null) return;
 
@@ -210,7 +224,9 @@ namespace SimpleTinyPDF
             float pdfY = CoordinateOrigin == CoordinateOrigin.TopDown
                 ? Height - y - maxFontSize : y;
 
-            _content.Append("q\nBT\n");
+            _content.Append("q\n");
+            AppendRotation(rotation, x, pdfY);
+            _content.Append("BT\n");
             _content.AppendFormat("{0} {1} Td\n", F(drawX), F(pdfY));
 
             PdfFont? lastFont = null;
@@ -288,7 +304,7 @@ namespace SimpleTinyPDF
             PdfFont font = PdfFont.Helvetica, float fontSize = 12f,
             float lineSpacing = 1.2f, PdfColor? color = null,
             TextAlignment alignment = TextAlignment.Left, bool underline = false,
-            float opacity = 1f, string link = null)
+            float opacity = 1f, string link = null, float rotation = 0f)
         {
             if (string.IsNullOrEmpty(text)) return y;
             var c = color ?? PdfColor.Black;
@@ -303,13 +319,16 @@ namespace SimpleTinyPDF
             if (underline)
                 ulLines = new List<(float, float, float)>();
 
+            bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;
+
             _content.Append("q\n");
             AppendOpacity(opacity);
+            float rotOriginY = topDown ? Height - y - fontSize : y;
+            AppendRotation(rotation, x, rotOriginY);
             _content.Append("BT\n");
             _content.AppendFormat("/{0} {1} Tf\n", fontId, F(fontSize));
             AppendColorFill(c);
 
-            bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;
             foreach (var line in lines)
             {
                 float pdfY = topDown ? Height - currentY - fontSize : currentY;
@@ -345,7 +364,7 @@ namespace SimpleTinyPDF
         /// </summary>
         public float DrawRichTextBox(IEnumerable<TextSpan> spans, float x, float y,
             float width, float lineSpacing = 1.2f,
-            TextAlignment alignment = TextAlignment.Left)
+            TextAlignment alignment = TextAlignment.Left, float rotation = 0f)
         {
             if (spans == null) return y;
 
@@ -367,7 +386,12 @@ namespace SimpleTinyPDF
             var ulSegments = new List<(float x, float pdfY, float width, float fontSize, PdfColor color)>();
 
             bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;
-            _content.Append("q\nBT\n");
+            float firstMaxFs = lines[0].MaxFontSize;
+            if (firstMaxFs <= 0) firstMaxFs = 12f;
+            float rotOriginY = topDown ? Height - y - firstMaxFs : y;
+            _content.Append("q\n");
+            AppendRotation(rotation, x, rotOriginY);
+            _content.Append("BT\n");
 
             PdfFont? lastFont = null;
             float lastFontSize = -1;
@@ -553,13 +577,14 @@ namespace SimpleTinyPDF
 
         /// <summary>Draws a straight line between two points.</summary>
         public void DrawLine(float x1, float y1, float x2, float y2,
-            PdfColor? color = null, float lineWidth = 1f)
+            PdfColor? color = null, float lineWidth = 1f, float rotation = 0f)
         {
             var c = color ?? PdfColor.Black;
             bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;
             float py1 = topDown ? Height - y1 : y1;
             float py2 = topDown ? Height - y2 : y2;
             _content.Append("q\n");
+            AppendRotation(rotation, x1, py1);
             _content.AppendFormat("{0} w\n", F(lineWidth));
             AppendColorStroke(c);
             _content.AppendFormat("{0} {1} m {2} {3} l S\n", F(x1), F(py1), F(x2), F(py2));
@@ -568,12 +593,13 @@ namespace SimpleTinyPDF
 
         /// <summary>Draws a rectangle outline (stroke only).</summary>
         public void DrawRectangle(float x, float y, float width, float height,
-            PdfColor? strokeColor = null, float lineWidth = 1f)
+            PdfColor? strokeColor = null, float lineWidth = 1f, float rotation = 0f)
         {
             var c = strokeColor ?? PdfColor.Black;
             float pdfY = CoordinateOrigin == CoordinateOrigin.TopDown
                 ? Height - y - height : y;
             _content.Append("q\n");
+            AppendRotation(rotation, x, pdfY + height);
             _content.AppendFormat("{0} w\n", F(lineWidth));
             AppendColorStroke(c);
             _content.AppendFormat("{0} {1} {2} {3} re S\n", F(x), F(pdfY), F(width), F(height));
@@ -582,11 +608,13 @@ namespace SimpleTinyPDF
 
         /// <summary>Draws a filled rectangle, optionally with a border.</summary>
         public void DrawFilledRectangle(float x, float y, float width, float height,
-            PdfColor fillColor, PdfColor? strokeColor = null, float lineWidth = 0f)
+            PdfColor fillColor, PdfColor? strokeColor = null, float lineWidth = 0f,
+            float rotation = 0f)
         {
             float pdfY = CoordinateOrigin == CoordinateOrigin.TopDown
                 ? Height - y - height : y;
             _content.Append("q\n");
+            AppendRotation(rotation, x, pdfY + height);
             AppendColorFill(fillColor);
             if (strokeColor.HasValue && lineWidth > 0)
             {
@@ -605,7 +633,8 @@ namespace SimpleTinyPDF
 
         /// <summary>Draws an image at the specified position and size.</summary>
         public void DrawImage(PdfImage image, float x, float y, float width, float height,
-            float opacity = 1f, ImageScaleMode scaleMode = ImageScaleMode.Stretch)
+            float opacity = 1f, ImageScaleMode scaleMode = ImageScaleMode.Stretch,
+            float rotation = 0f)
         {
             if (image == null)
                 throw new ArgumentNullException(nameof(image));
@@ -655,6 +684,10 @@ namespace SimpleTinyPDF
             }
 
             AppendOpacity(opacity);
+
+            // Apply user rotation around the user-provided (x, y) position
+            float rotPdfY = topDown ? Height - y : y;
+            AppendRotation(rotation, x, rotPdfY);
 
             // Apply CTM based on EXIF orientation
             switch (image.ExifOrientation)

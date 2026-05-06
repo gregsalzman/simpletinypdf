@@ -2,7 +2,23 @@
 
 An extremely small, zero-dependency PDF generation library for .NET.
 
-SimpleTinyPDF lets you create PDF documents from C# with no external packages. It targets .NET Standard 2.0, so it works with .NET Framework 4.6.1+, .NET Core 2.0+, and .NET 5+. The API is deliberately small: you add pages, draw text, images, shapes, and tables, then save. There is no DOM, no layout engine, and no markup language — you position everything in points.
+SimpleTinyPDF lets you create PDF documents from C# with no external packages. It targets .NET Standard 2.0, so it works with .NET Framework 4.6.1+, .NET Core 2.0+, and .NET 5+. You add pages, draw text, images, shapes, and tables, etc then save. There is no DOM, no layout engine, and no markup language — you position everything in points.
+
+## Features
+
+- **Text** — single-line, wrapped text boxes, rich text with mixed fonts/sizes/colors, alignment (left, center, right), underline, hyperlinks, opacity
+- **Images** — JPEG and PNG (with transparency), EXIF auto-orientation, scaling modes (Stretch, Fit, Fill), opacity
+- **Shapes** — lines, rectangles (stroke and/or fill)
+- **Rotation** — rotate any text, image, or shape element by an arbitrary angle
+- **Tables** — styled headers, column alignment, alternate row shading, auto-pagination with repeated headers, CSV import
+- **Lists** — bulleted and numbered
+- **Bookmarks** — hierarchical outline / table of contents
+- **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) with extended European character support
+- **Colors** — RGB, CMYK, and grayscale 
+- **Page sizes** — A3, A4, A5, Letter, Legal, custom dimensions, landscape
+- **Coordinates** — top-down (default) or native PDF bottom-up
+- **Metadata** — document title and author
+- **Zero dependencies** — no NuGet packages, no native libraries
 
 ## Pros and Cons
 
@@ -25,16 +41,17 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 
 ## Size Comparison
 
-One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other popular .NET PDF libraries (as of April 2026):
+One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other popular .NET PDF libraries:
 
-| Library | Version | NuGet Package Size |
-|---|---|---|
-| **SimpleTinyPDF** | 1.0 | ~66 KB |
-| **PDFsharp** | 6.2.4 | ~4.41 MB |
-| **iText** | 9.6.0 | ~5.02 MB |
-| **QuestPDF** | 2026.2.4 | ~35.88 MB |
+| Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
+|---|---|---|---|---|
+| **SimpleTinyPDF** | **~68 KB** | **~68 KB** | **1x** | No |
+| **PDFsharp** 6.2.4 | ~4.4 MB | ~4.5 MB | 66x | No |
+| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 200x | No (BouncyCastle ~8 MB) |
+| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 530x | Yes (bundled Skia) |
+| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 3,700x | Yes (bundled Chromium) |
 
-QuestPDF's size reflects bundled native SkiaSharp binaries.
+IronPDF's footprint includes the Chromium rendering engine downloaded at build/runtime. QuestPDF bundles custom Skia native binaries for cross-platform rendering.
 
 ## API Reference
 
@@ -71,31 +88,6 @@ byte[] bytes = doc.ToArray(); // get as byte array
 | `AddImage(PdfImage)` | Register an image (deduplicates identical content) |
 | `Save(string)` / `Save(Stream)` | Write PDF to file or stream |
 | `ToArray()` | Return PDF as a byte array |
-
-### Bookmarks
-
-Add bookmarks (outlines) that appear in the PDF viewer's navigation panel. Bookmarks can be nested to create a hierarchical table of contents.
-
-```csharp
-// Top-level bookmarks
-var ch1 = doc.AddBookmark("Chapter 1", page1);
-var ch2 = doc.AddBookmark("Chapter 2", page2);
-
-// Nested bookmarks — point to a specific Y position on the page
-ch1.AddBookmark("Installation", page1, y: 150);
-ch1.AddBookmark("Configuration", page1, y: 350);
-
-// Deeper nesting
-var advanced = ch2.AddBookmark("Advanced Topics", page3);
-advanced.AddBookmark("Performance Tuning", page3, y: 200);
-```
-
-| Method | Description |
-|---|---|
-| `PdfDocument.AddBookmark(title, page, y?)` | Add a top-level bookmark. Returns the bookmark for nesting children. |
-| `PdfBookmark.AddBookmark(title, page, y?)` | Add a child bookmark under this one. |
-
-When `y` is omitted the bookmark fits the entire page. When `y` is provided the viewer scrolls to that vertical position (in the page's coordinate system).
 
 ### PdfPage
 
@@ -145,11 +137,15 @@ page.DrawRichText(new[] {
     new TextSpan(" for details.")
 }, 50, 220);
 
-// Rich text box (mixed formatting with word wrap.  In this example, spans is an array of TextSpan)
+// Rich text box (mixed formatting with word wrap)
 float nextY2 = page.DrawRichTextBox(spans, 50, 240, width: 400);
 
 // Measure text width
 float w = page.MeasureText("Hello", PdfFont.Helvetica, 12);
+
+// Rotated text — angle in degrees, clockwise
+page.DrawText("Rotated 45°", 300, 100, fontSize: 16, rotation: 45);
+page.DrawTextBox("Rotated text box", 300, 200, width: 150, rotation: 90);
 ```
 
 | Method | Returns | Description |
@@ -159,6 +155,18 @@ float w = page.MeasureText("Hello", PdfFont.Helvetica, 12);
 | `DrawRichText(...)` | void | Single line with mixed formatting |
 | `DrawRichTextBox(...)` | float | Wrapped mixed-format text |
 | `MeasureText(text, font, size)` | float | Width of text in points |
+
+**TextSpan** is used with `DrawRichText` and `DrawRichTextBox` for mixed-format text:
+
+```csharp
+new TextSpan("hello")                                          // defaults: Helvetica 12pt black
+new TextSpan("bold", PdfFont.HelveticaBold, 14)                // custom font/size
+new TextSpan("fancy", PdfFont.TimesItalic, 12, PdfColor.Blue, underline: true, opacity: 0.8f)
+new TextSpan("click me", PdfFont.Helvetica, 12, PdfColor.Blue, underline: true,
+    link: "https://example.com")                               // hyperlink
+```
+
+**TextAlignment:** `TextAlignment.Left` (default), `TextAlignment.Center`, `TextAlignment.Right`
 
 **Lists**
 
@@ -178,6 +186,11 @@ y = page.DrawNumberedList(
 page.DrawLine(50, 100, 500, 100, PdfColor.Black, lineWidth: 0.5f);
 page.DrawRectangle(50, 110, 200, 80, PdfColor.DarkGray, lineWidth: 1f);
 page.DrawFilledRectangle(50, 200, 200, 80, PdfColor.Rgb(230, 240, 255), PdfColor.Black, lineWidth: 0.5f);
+
+// Rotated shapes — angle in degrees, clockwise
+page.DrawFilledRectangle(300, 100, 80, 40, PdfColor.Blue, rotation: 45);
+page.DrawRectangle(300, 200, 80, 80, PdfColor.Green, lineWidth: 2, rotation: 30);
+page.DrawLine(100, 300, 300, 300, PdfColor.Red, lineWidth: 2, rotation: 90);
 ```
 
 **Images**
@@ -187,6 +200,9 @@ var logo = PdfImage.FromFile("logo.png");
 page.DrawImage(logo, x: 50, y: 30, width: 120, height: 40);
 page.DrawImage(logo, x: 50, y: 30, width: 120, height: 40, opacity: 0.5f);
 page.DrawImage(logo, x: 50, y: 30, width: 120, height: 40, scaleMode: ImageScaleMode.Fit);
+
+// Rotated image — angle in degrees, clockwise
+page.DrawImage(logo, x: 200, y: 100, width: 120, height: 40, rotation: 90);
 ```
 
 JPEG and PNG are supported (auto-detected). PNG transparency is preserved. EXIF orientation tags are automatically applied.
@@ -198,6 +214,20 @@ The `scaleMode` parameter controls how the image is scaled to fit the target rec
 | `Stretch` (default) | Ignored | Fills the entire area exactly; image may be distorted |
 | `Fit` | Preserved | Scales to fit inside the area; image is centered with possible letterboxing |
 | `Fill` | Preserved | Scales to cover the entire area; image is centered and overflow is clipped |
+
+**Rotation**
+
+All drawing methods (`DrawText`, `DrawRichText`, `DrawTextBox`, `DrawRichTextBox`, `DrawImage`, `DrawLine`, `DrawRectangle`, `DrawFilledRectangle`) accept an optional `rotation` parameter:
+
+- **Angle** is in degrees, clockwise (matching CSS convention)
+- **Origin** is the element's `(x, y)` position
+- Default is `0` (no rotation)
+
+```csharp
+// Watermark-style diagonal text
+page.DrawText("DRAFT", 300, 400, PdfFont.HelveticaBold, 72,
+    PdfColor.Rgb(200, 200, 200), TextAlignment.Center, opacity: 0.3f, rotation: -45);
+```
 
 **Tables**
 
@@ -310,21 +340,30 @@ var landscape = PageSize.A4.Landscape();
 var custom = new PageSize(400, 600);  // width x height in points
 ```
 
-### TextSpan
+### Bookmarks
 
-Used with `DrawRichText` and `DrawRichTextBox` for mixed-format text.
+Add bookmarks (outlines) that appear in the PDF viewer's navigation panel. Bookmarks can be nested to create a hierarchical table of contents.
 
 ```csharp
-new TextSpan("hello")                                          // defaults: Helvetica 12pt black
-new TextSpan("bold", PdfFont.HelveticaBold, 14)                // custom font/size
-new TextSpan("fancy", PdfFont.TimesItalic, 12, PdfColor.Blue, underline: true, opacity: 0.8f)
-new TextSpan("click me", PdfFont.Helvetica, 12, PdfColor.Blue, underline: true,
-    link: "https://example.com")                               // hyperlink
+// Top-level bookmarks
+var ch1 = doc.AddBookmark("Chapter 1", page1);
+var ch2 = doc.AddBookmark("Chapter 2", page2);
+
+// Nested bookmarks — point to a specific Y position on the page
+ch1.AddBookmark("Installation", page1, y: 150);
+ch1.AddBookmark("Configuration", page1, y: 350);
+
+// Deeper nesting
+var advanced = ch2.AddBookmark("Advanced Topics", page3);
+advanced.AddBookmark("Performance Tuning", page3, y: 200);
 ```
 
-### TextAlignment
+| Method | Description |
+|---|---|
+| `PdfDocument.AddBookmark(title, page, y?)` | Add a top-level bookmark. Returns the bookmark for nesting children. |
+| `PdfBookmark.AddBookmark(title, page, y?)` | Add a child bookmark under this one. |
 
-`TextAlignment.Left` (default), `TextAlignment.Center`, `TextAlignment.Right`
+When `y` is omitted the bookmark fits the entire page. When `y` is provided the viewer scrolls to that vertical position (in the page's coordinate system).
 
 ## Example: Invoice with Company Logo
 
@@ -477,6 +516,13 @@ SimpleTinyPDF uses the 14 standard PDF Type 1 fonts. These fonts are built into 
 - Emoji
 
 If your project requires custom fonts or broad Unicode support, consider a full-featured PDF library such as QuestPDF, iTextSharp, or PdfSharp.
+
+## Version History
+
+| Version | Date | Changes |
+|---|---|---|
+| 0.51 | May 2026 | Add rotation support for text, images, and shapes |
+| 0.50 | April 2026 | Initial beta release |
 
 ## Development Notes
 
