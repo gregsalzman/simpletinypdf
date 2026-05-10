@@ -107,6 +107,17 @@ namespace SimpleTinyPDF
 
         private static string F(float v) => v.ToString("0.####", CultureInfo.InvariantCulture);
 
+        private static string ToRoman(int n)
+        {
+            if (n <= 0) return n.ToString();
+            int[]    values = { 1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1 };
+            string[] syms   = { "M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I" };
+            var sb = new StringBuilder();
+            for (int i = 0; i < values.Length; i++)
+                while (n >= values[i]) { sb.Append(syms[i]); n -= values[i]; }
+            return sb.ToString();
+        }
+
         private void AppendRotation(float angleDegrees, float pdfOriginX, float pdfOriginY)
         {
             if (Math.Abs(angleDegrees) < 0.001f) return;
@@ -531,46 +542,143 @@ namespace SimpleTinyPDF
         // ── Lists ─────────────────────────────────────────────────
 
         /// <summary>
-        /// Draws a bulleted list. Returns the Y position after the last item.
+        /// Draws a list of items with optional nesting, automatic page flow, and text wrapping
+        /// at every level. Returns the page and Y position after the last item.
         /// </summary>
-        public float DrawBulletList(string[] items, float x, float y, float width,
+        /// <param name="items">The list items to render. Each item may have nested children.</param>
+        /// <param name="x">Left edge of the list in points.</param>
+        /// <param name="y">Top of the list in points (TopDown) or bottom (BottomUp).</param>
+        /// <param name="width">Available width in points including the indent for the first level.</param>
+        /// <param name="style">Bullet or Numbered. Individual items may override the style for their children.</param>
+        /// <param name="bottomMargin">Distance from the page bottom (or top in BottomUp) at which a new page is created.</param>
+        /// <param name="font">Font used for item text and numbered markers.</param>
+        /// <param name="fontSize">Font size in points.</param>
+        /// <param name="lineSpacing">Line height multiplier.</param>
+        /// <param name="color">Text color. Defaults to black.</param>
+        /// <param name="bullet">
+        /// Bullet symbol and font. Null uses "•" in the list font.
+        /// Supply a <see cref="TextSpan"/> to use a different font or symbol (e.g. ZapfDingbats).
+        /// </param>
+        /// <param name="startNumber">First number for a top-level Numbered list.</param>
+        /// <param name="indentPerLevel">Horizontal indent added per nesting level in points.</param>
+        /// <param name="continuationY">
+        /// Y position to use at the top of continuation pages created during overflow.
+        /// Defaults to the same <paramref name="y"/> as the first page.
+        /// </param>
+        public (PdfPage page, float y) DrawList(
+            ListItem[] items,
+            float x, float y, float width,
+            ListStyle style = ListStyle.Bullet,
+            float bottomMargin = 0f,
             PdfFont font = PdfFont.Helvetica, float fontSize = 12f,
             float lineSpacing = 1.2f, PdfColor? color = null,
-            string bulletChar = "\u2022", float indent = 15f)
+            TextSpan bullet = null,
+            int startNumber = 1,
+            float indentPerLevel = 20f,
+            float? continuationY = null)
         {
-            if (items == null || items.Length == 0) return y;
-            bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;
-            float currentY = y;
-            foreach (var item in items)
-            {
-                DrawText(bulletChar, x, currentY, font, fontSize, color);
-                currentY = DrawTextBox(item, x + indent, currentY, width - indent,
-                    font, fontSize, lineSpacing, color);
-                currentY += (topDown ? 1 : -1) * fontSize * 0.3f;
-            }
-            return currentY;
+            if (items == null || items.Length == 0) return (this, y);
+            var c = color ?? PdfColor.Black;
+            var effectiveBullet = bullet ?? new TextSpan("\u2022", font, fontSize, c);
+            float startY = continuationY ?? y;
+            var counters = new int[] { startNumber };
+            return DrawListItems(this, items, x, y, width, startY, bottomMargin,
+                0, counters, font, fontSize, lineSpacing, c, style, effectiveBullet, indentPerLevel);
         }
 
-        /// <summary>
-        /// Draws a numbered list. Returns the Y position after the last item.
-        /// </summary>
-        public float DrawNumberedList(string[] items, float x, float y, float width,
-            PdfFont font = PdfFont.Helvetica, float fontSize = 12f,
-            float lineSpacing = 1.2f, PdfColor? color = null,
-            int startNumber = 1, float indent = 20f)
+        private (PdfPage page, float y) DrawListItems(
+            PdfPage currentPage,
+            IReadOnlyList<ListItem> items,
+            float x, float y, float width,
+            float startY,
+            float bottomMargin,
+            int depth,
+            int[] counters,
+            PdfFont font, float fontSize, float lineSpacing, PdfColor color,
+            ListStyle style, TextSpan bullet, float indentPerLevel)
         {
-            if (items == null || items.Length == 0) return y;
             bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;
-            float currentY = y;
-            for (int i = 0; i < items.Length; i++)
+            int sign = topDown ? 1 : -1;
+
+            // Ensure the counters array is large enough for this depth
+            if (depth >= counters.Length)
             {
-                string num = (startNumber + i) + ".";
-                DrawText(num, x, currentY, font, fontSize, color);
-                currentY = DrawTextBox(items[i], x + indent, currentY, width - indent,
-                    font, fontSize, lineSpacing, color);
-                currentY += (topDown ? 1 : -1) * fontSize * 0.3f;
+                var expanded = new int[depth + 1];
+                Array.Copy(counters, expanded, counters.Length);
+                expanded[depth] = 1;
+                counters = expanded;
             }
-            return currentY;
+
+            float textWidth = width - indentPerLevel;
+            if (textWidth <= 0f) return (currentPage, y); // no space left
+
+            foreach (var item in items)
+            {
+                // Pre-calculate item height to detect page overflow before drawing
+                var lines = FontMetrics.WrapText(item.Text, font, fontSize, textWidth);
+                float itemHeight = lines.Count * fontSize * lineSpacing;
+
+                // Page-overflow check
+                bool overflows = topDown
+                    ? y + itemHeight > currentPage.Height - bottomMargin
+                    : y - itemHeight < bottomMargin;
+
+                if (overflows && currentPage.Document != null)
+                {
+                    currentPage = currentPage.Document.AddPage(
+                        new PageSize(currentPage.Width, currentPage.Height));
+                    currentPage.CoordinateOrigin = CoordinateOrigin;
+                    y = startY;
+                }
+
+                // Draw marker
+                if (style == ListStyle.Bullet)
+                {
+                    currentPage.DrawText(bullet.Text, x, y, bullet.Font, bullet.FontSize, bullet.Color);
+                }
+                else
+                {
+                    string marker =
+                        style == ListStyle.RomanLower ? ToRoman(counters[depth]).ToLowerInvariant() + "." :
+                        style == ListStyle.RomanUpper ? ToRoman(counters[depth]) + "." :
+                        counters[depth] + ".";
+                    currentPage.DrawText(marker, x, y, font, fontSize, color);
+                }
+
+                // Draw item text (handles wrapping internally)
+                y = currentPage.DrawTextBox(item.Text, x + indentPerLevel, y, textWidth,
+                    font, fontSize, lineSpacing, color);
+
+                // Gap between items
+                y += sign * fontSize * 0.3f;
+
+                counters[depth]++;
+
+                // Recurse into children
+                if (item.Children.Count > 0)
+                {
+                    var childStyle = item.ChildrenStyle ?? style;
+                    var childBullet = item.ChildrenBullet ?? bullet;
+
+                    // Reset counter for the child level
+                    if (depth + 1 >= counters.Length)
+                    {
+                        var expanded = new int[depth + 2];
+                        Array.Copy(counters, expanded, counters.Length);
+                        counters = expanded;
+                    }
+                    counters[depth + 1] = 1;
+
+                    (currentPage, y) = DrawListItems(
+                        currentPage, item.Children,
+                        x + indentPerLevel, y, width - indentPerLevel,
+                        startY, bottomMargin, depth + 1, counters,
+                        font, fontSize, lineSpacing, color,
+                        childStyle, childBullet, indentPerLevel);
+                }
+            }
+
+            return (currentPage, y);
         }
 
         // ── Shapes ────────────────────────────────────────────────

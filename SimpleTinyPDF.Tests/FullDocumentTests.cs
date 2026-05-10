@@ -85,12 +85,12 @@ namespace SimpleTinyPDF.Tests
             // Terms
             page.DrawText("Terms & Conditions:", 50, y, PdfFont.HelveticaBold, 11);
             y += 18;
-            y = page.DrawBulletList(new[]
+            (_, y) = page.DrawList(new[]
             {
-                "Payment is due within 30 days of receipt",
-                "Late payments subject to 1.5% monthly interest",
-                "Please make checks payable to Acme Corporation"
-            }, 50, y, 450, PdfFont.Helvetica, 9, color: PdfColor.DarkGray);
+                new ListItem("Payment is due within 30 days of receipt"),
+                new ListItem("Late payments subject to 1.5% monthly interest"),
+                new ListItem("Please make checks payable to Acme Corporation")
+            }, 50, y, 450, font: PdfFont.Helvetica, fontSize: 9, color: PdfColor.DarkGray);
 
             // Footer
             page.DrawLine(50, 790, 545, 790, PdfColor.LightGray, 0.5f);
@@ -141,13 +141,13 @@ namespace SimpleTinyPDF.Tests
             y += 20;
             page1.DrawText("Key Highlights:", 50, y, PdfFont.HelveticaBold, 14);
             y += 20;
-            y = page1.DrawBulletList(new[]
+            (_, y) = page1.DrawList(new[]
             {
-                "Revenue increased 15% quarter-over-quarter",
-                "Customer satisfaction scores reached an all-time high of 94%",
-                "Successfully launched three new product lines",
-                "Expanded into two new international markets"
-            }, 50, y, 495, PdfFont.Helvetica, 11);
+                new ListItem("Revenue increased 15% quarter-over-quarter"),
+                new ListItem("Customer satisfaction scores reached an all-time high of 94%"),
+                new ListItem("Successfully launched three new product lines"),
+                new ListItem("Expanded into two new international markets")
+            }, 50, y, 495, font: PdfFont.Helvetica, fontSize: 11);
 
             y += 20;
 

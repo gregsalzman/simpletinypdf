@@ -8,13 +8,13 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 
 - **Text** — single-line, wrapped text boxes, rich text with mixed fonts/sizes/colors, alignment (left, center, right), underline, hyperlinks, opacity
 - **Images** — JPEG and PNG (with transparency), EXIF auto-orientation, scaling modes (Stretch, Fit, Fill), opacity
+- **Tables** — styled headers, column alignment, alternate row shading, auto-pagination with repeated headers, CSV import
+- **Lists** — bullet, numbered, lowercase Roman (i, ii, iii…), and uppercase Roman (I, II, III…); unlimited nesting with per-level style overrides and custom bullet symbols; automatic text wrapping and multi-page flow
 - **Shapes** — lines, rectangles (stroke and/or fill)
 - **Rotation** — rotate any text, image, or shape element by an arbitrary angle
-- **Tables** — styled headers, column alignment, alternate row shading, auto-pagination with repeated headers, CSV import
-- **Lists** — bulleted and numbered
 - **Bookmarks** — hierarchical outline / table of contents
 - **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) with extended European character support
-- **Colors** — RGB, CMYK, and grayscale 
+- **Colors** — RGB, CMYK, and grayscale
 - **Page sizes** — A3, A4, A5, Letter, Legal, custom dimensions, landscape
 - **Coordinates** — top-down (default) or native PDF bottom-up
 - **Metadata** — document title and author
@@ -168,18 +168,6 @@ new TextSpan("click me", PdfFont.Helvetica, 12, PdfColor.Blue, underline: true,
 
 **TextAlignment:** `TextAlignment.Left` (default), `TextAlignment.Center`, `TextAlignment.Right`
 
-**Lists**
-
-```csharp
-float y = page.DrawBulletList(
-    new[] { "First item", "Second item", "Third item" },
-    x: 50, y: 300, width: 400);
-
-y = page.DrawNumberedList(
-    new[] { "Step one", "Step two", "Step three" },
-    x: 50, y: y, width: 400, startNumber: 1);
-```
-
 **Shapes**
 
 ```csharp
@@ -241,6 +229,87 @@ Tables that exceed the page height automatically continue on new pages with repe
 // Table starts at y=300 on page 1, but at y=50 on continuation pages
 page.DrawTable(table, x: 50, y: 300, continuationY: 50);
 ```
+
+**Lists**
+
+`DrawList` renders a hierarchical list and returns a `(PdfPage page, float y)` tuple indicating where rendering ended, so you can continue drawing below it — including on a different page if the list overflowed.
+
+```csharp
+var items = new[]
+{
+    new ListItem("Introduction"),
+    new ListItem("Installation",
+        new ListItem("Windows"),
+        new ListItem("macOS"),
+        new ListItem("Linux")),
+    new ListItem("Configuration")
+};
+
+// Bullet list (default)
+var (nextPage, nextY) = page.DrawList(items, x: 50, y: 100, width: 450);
+
+// Numbered list
+var (nextPage, nextY) = page.DrawList(items, x: 50, y: 100, width: 450,
+    style: ListStyle.Numbered);
+
+// Lowercase Roman numerals (i, ii, iii…)
+var (nextPage, nextY) = page.DrawList(items, x: 50, y: 100, width: 450,
+    style: ListStyle.RomanLower);
+
+// Uppercase Roman numerals (I, II, III…)
+var (nextPage, nextY) = page.DrawList(items, x: 50, y: 100, width: 450,
+    style: ListStyle.RomanUpper);
+
+// Multi-page list — automatically flows to new pages
+var (lastPage, endY) = page.DrawList(items, x: 50, y: 100, width: 450,
+    bottomMargin: 50, continuationY: 50);
+```
+
+Each item can override the style and bullet symbol used for its children:
+
+```csharp
+var items = new[]
+{
+    // Children use numbered style
+    new ListItem("Chapter 1", ListStyle.Numbered,
+        new ListItem("Section 1.1"),
+        new ListItem("Section 1.2")),
+
+    // Children use Roman numerals with a custom bullet symbol at the next level
+    new ListItem("Chapter 2", ListStyle.RomanUpper,
+        new ListItem("Part I", ListStyle.RomanLower,
+            new ListItem("Sub-part a"))),
+};
+```
+
+To use a custom bullet symbol from Symbol or ZapfDingbats, pass a `TextSpan` as the bullet:
+
+```csharp
+// Custom top-level bullet
+var (nextPage, nextY) = page.DrawList(items, x: 50, y: 100, width: 450,
+    bullet: new TextSpan("»", PdfFont.Helvetica));
+
+// Per-level custom symbols via ChildrenBullet
+new ListItem("Top item", ListStyle.Bullet, new TextSpan("‣", PdfFont.Helvetica),
+    new ListItem("Child item"))
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `items` | required | Array of `ListItem` to render |
+| `x` | required | Left edge in points |
+| `y` | required | Top of first item in points |
+| `width` | required | Available width for text wrapping |
+| `style` | `Bullet` | `Bullet`, `Numbered`, `RomanLower`, or `RomanUpper` |
+| `bottomMargin` | 0 | Distance from page bottom before a new page is added |
+| `font` | Helvetica | Font for item text and numbered markers |
+| `fontSize` | 12 | Font size in points |
+| `lineSpacing` | 1.2 | Line spacing multiplier |
+| `color` | Black | Text and marker color |
+| `bullet` | `•` | Bullet symbol (used when style is `Bullet`) |
+| `startNumber` | 1 | Starting counter value (numbered/Roman styles) |
+| `indentPerLevel` | 20 | Horizontal indent per nesting level in points |
+| `continuationY` | same as `y` | Y position on continuation pages |
 
 ### PdfTable
 
@@ -521,6 +590,7 @@ If your project requires custom fonts or broad Unicode support, consider a full-
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.52 | May 2026 | Add hierarchical lists with nesting, text wrapping, multi-page flow, and four list styles (Bullet, Numbered, RomanLower, RomanUpper) |
 | 0.51 | May 2026 | Add rotation support for text, images, and shapes |
 | 0.50 | April 2026 | Initial beta release |
 
