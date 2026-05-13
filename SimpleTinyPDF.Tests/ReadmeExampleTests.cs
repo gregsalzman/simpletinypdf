@@ -61,6 +61,12 @@ namespace SimpleTinyPDF.Tests
             page.DrawText("Total Due:", totalsX, totalsY + 42, PdfFont.HelveticaBold, 12);
             page.DrawText("$4,924.80", 562, totalsY + 42, PdfFont.HelveticaBold, 12, alignment: TextAlignment.Right);
 
+            // QR code for online payment
+            page.DrawBarcode("https://github.com/gregsalzman/simpletinypdf", BarcodeType.QrCode,
+                50, totalsY, 80, 80);
+            page.DrawText("Scan to pay online.", 90, totalsY + 85, PdfFont.Helvetica, 8,
+                PdfColor.DarkGray, TextAlignment.Center);
+
             // Footer note
             page.DrawText("Payment is due within 30 days. Thank you for your business!",
                 306, 720, PdfFont.HelveticaOblique, 9, PdfColor.DarkGray, TextAlignment.Center);

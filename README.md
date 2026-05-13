@@ -9,6 +9,7 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 - **Text** — single-line, wrapped text boxes, rich text with mixed fonts/sizes/colors, alignment (left, center, right), underline, hyperlinks, opacity
 - **Images** — JPEG and PNG (with transparency), EXIF auto-orientation, scaling modes (Stretch, Fit, Fill), opacity
 - **Tables** — styled headers, column alignment, alternate row shading, auto-pagination with repeated headers, CSV import
+- **Barcodes** — Code 128, Code 39, EAN-13, UPC-A, and QR Code; pure vector rendering (no images); configurable colors, quiet zones, human-readable text, rotation, and opacity
 - **Lists** — bullet, numbered, lowercase Roman (i, ii, iii…), and uppercase Roman (I, II, III…); unlimited nesting with per-level style overrides and custom bullet symbols; automatic text wrapping and multi-page flow
 - **Shapes** — lines, rectangles (stroke and/or fill)
 - **Rotation** — rotate any text, image, or shape element by an arbitrary angle
@@ -45,11 +46,11 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~68 KB** | **~68 KB** | **1x** | No |
-| **PDFsharp** 6.2.4 | ~4.4 MB | ~4.5 MB | 66x | No |
-| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 200x | No (BouncyCastle ~8 MB) |
-| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 530x | Yes (bundled Skia) |
-| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 3,700x | Yes (bundled Chromium) |
+| **SimpleTinyPDF** | **~92 KB** | **~92 KB** | **1x** | No |
+| **PDFsharp** 6.2.4 | ~4.4 MB | ~4.5 MB | 49x | No |
+| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 163x | No (BouncyCastle ~8 MB) |
+| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 391x | Yes (bundled Skia) |
+| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 2,700x | Yes (bundled Chromium) |
 
 IronPDF's footprint includes the Chromium rendering engine downloaded at build/runtime. QuestPDF bundles custom Skia native binaries for cross-platform rendering.
 
@@ -434,6 +435,61 @@ advanced.AddBookmark("Performance Tuning", page3, y: 200);
 
 When `y` is omitted the bookmark fits the entire page. When `y` is provided the viewer scrolls to that vertical position (in the page's coordinate system).
 
+### Barcodes
+
+Draw 1D barcodes and QR codes as crisp vector graphics (PDF rectangles, not images). All encoding, check digits, and error correction are computed internally with zero dependencies.
+
+```csharp
+// EAN-13 barcode (check digit computed automatically)
+page.DrawBarcode("590123412345", BarcodeType.Ean13, 50, 100, 200, 80);
+
+// QR code with high error correction
+page.DrawBarcode("https://example.com", BarcodeType.QrCode, 50, 200, 150, 150,
+    new BarcodeOptions { QrErrorCorrectionLevel = QrErrorCorrection.High });
+
+// Code 128 with human-readable text below
+page.DrawBarcode("ABC-12345", BarcodeType.Code128, 50, 400, 250, 60,
+    new BarcodeOptions { ShowText = true });
+
+// UPC-A (12-digit North American retail)
+page.DrawBarcode("01234567890", BarcodeType.UpcA, 50, 500, 200, 80);
+
+// Custom colors and rotation
+page.DrawBarcode("HELLO", BarcodeType.Code39, 300, 100, 200, 60,
+    new BarcodeOptions
+    {
+        ForegroundColor = PdfColor.Navy,
+        BackgroundColor = PdfColor.Rgb(245, 245, 255),
+        ShowText = true,
+        Rotation = 90
+    });
+```
+
+**Supported barcode types:**
+
+| Type | Characters | Use Cases |
+|---|---|---|
+| `Code128` | ASCII 0-127 | Shipping, logistics, general-purpose |
+| `Code39` | 0-9, A-Z, - . $ / + % SPACE | Industrial, warehouse, military |
+| `Ean13` | 12-13 digits | Retail products (international) |
+| `UpcA` | 11-12 digits | Retail products (North America) |
+| `QrCode` | Any text (UTF-8) | URLs, payments, WiFi, general data |
+
+**BarcodeOptions:**
+
+| Property | Default | Description |
+|---|---|---|
+| `ForegroundColor` | Black | Bar / module color |
+| `BackgroundColor` | White | Background color |
+| `DrawBackground` | true | Whether to fill the background |
+| `IncludeQuietZone` | true | Add required white-space margin (within specified width/height) |
+| `ShowText` | false | Human-readable text below 1D barcodes |
+| `TextFont` | Courier | Font for human-readable text |
+| `TextFontSize` | 8 | Font size for human-readable text |
+| `QrErrorCorrectionLevel` | Medium | `Low`, `Medium`, `Quartile`, or `High` (QR only) |
+| `Rotation` | 0 | Clockwise rotation in degrees |
+| `Opacity` | 1.0 | 0.0 (transparent) to 1.0 (opaque) |
+
 ## Example: Invoice with Company Logo
 
 ![Invoice example output](docs/example-invoice.png)
@@ -498,6 +554,12 @@ page.DrawText("$364.80", 562, totalsY + 18, PdfFont.Helvetica, 10, alignment: Te
 page.DrawLine(totalsX, totalsY + 34, 562, totalsY + 34, PdfColor.Black, 0.5f);
 page.DrawText("Total Due:", totalsX, totalsY + 42, PdfFont.HelveticaBold, 12);
 page.DrawText("$4,924.80", 562, totalsY + 42, PdfFont.HelveticaBold, 12, alignment: TextAlignment.Right);
+
+// QR code for online payment
+page.DrawBarcode("https://github.com/gregsalzman/simpletinypdf", BarcodeType.QrCode,
+    50, totalsY, 80, 80);
+page.DrawText("Scan to pay online.", 90, totalsY + 85, PdfFont.Helvetica, 8,
+    PdfColor.DarkGray, TextAlignment.Center);
 
 // Footer note
 page.DrawText("Payment is due within 30 days. Thank you for your business!",
@@ -590,6 +652,7 @@ If your project requires custom fonts or broad Unicode support, consider a full-
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.53 | May 2026 | Add barcode and QR code support (Code 128, Code 39, EAN-13, UPC-A, QR Code) with vector rendering and configurable options |
 | 0.52 | May 2026 | Add hierarchical lists with nesting, text wrapping, multi-page flow, and four list styles (Bullet, Numbered, RomanLower, RomanUpper) |
 | 0.51 | May 2026 | Add rotation support for text, images, and shapes |
 | 0.50 | April 2026 | Initial beta release |

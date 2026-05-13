@@ -46,6 +46,7 @@ namespace SimpleTinyPDF
         internal Dictionary<string, PdfImage> GetUsedImages() => _usedImages;
         internal Dictionary<float, string> GetUsedGraphicsStates() => _usedGraphicsStates;
         internal string GetContentStream() => _content.ToString();
+        internal StringBuilder GetContentBuilder() => _content;
         internal IReadOnlyList<LinkAnnotation> GetLinkAnnotations() => _linkAnnotations;
 
         internal EncodingExtension GetOrCreateEncodingExtension(PdfFont font)
@@ -850,6 +851,30 @@ namespace SimpleTinyPDF
         {
             return table.Render(this, x, y, bottomMargin, continuationY);
         }
+        // ── Barcodes ─────────────────────────────────────────────
+
+        /// <summary>
+        /// Draws a barcode at the specified position and size.
+        /// </summary>
+        /// <param name="data">The data to encode (text, digits, URL, etc.).</param>
+        /// <param name="type">The barcode symbology.</param>
+        /// <param name="x">Left edge in points.</param>
+        /// <param name="y">Top edge (TopDown) or bottom edge (BottomUp) in points.</param>
+        /// <param name="width">Width in points.</param>
+        /// <param name="height">Height in points.</param>
+        /// <param name="options">Optional rendering settings.</param>
+        public void DrawBarcode(string data, BarcodeType type,
+            float x, float y, float width, float height,
+            BarcodeOptions options = null)
+        {
+            BarcodeRenderer.Render(this, data, type, x, y, width, height, options);
+        }
+
+        internal void ApplyOpacity(float opacity) => AppendOpacity(opacity);
+
+        internal void ApplyRotation(float angleDegrees, float pdfOriginX, float pdfOriginY)
+            => AppendRotation(angleDegrees, pdfOriginX, pdfOriginY);
+
         // ── Link annotations ──────────────────────────────────────
 
         private void AddLinkAnnotation(string url, float drawX, float pdfY, float width, float fontSize)
