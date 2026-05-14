@@ -40,23 +40,9 @@ namespace SimpleTinyPDF
         }
     }
 
-    internal class PdfStream : PdfObj
+    internal class PdfStream : PdfDict
     {
-        internal readonly List<KeyValuePair<string, string>> Entries = new List<KeyValuePair<string, string>>();
         internal byte[] Data = Array.Empty<byte>();
-
-        internal void Set(string key, string value)
-        {
-            for (int i = 0; i < Entries.Count; i++)
-            {
-                if (Entries[i].Key == key)
-                {
-                    Entries[i] = new KeyValuePair<string, string>(key, value);
-                    return;
-                }
-            }
-            Entries.Add(new KeyValuePair<string, string>(key, value));
-        }
 
         internal override void WriteTo(PdfBinaryWriter w)
         {

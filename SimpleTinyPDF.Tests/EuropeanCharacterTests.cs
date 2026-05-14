@@ -10,23 +10,13 @@ namespace SimpleTinyPDF.Tests
         // ── GlyphMapping coverage ──────────────────────────────────
 
         [Fact]
-        public void GlyphMapping_AllGlyphNames_HaveBaseCharForWidth()
+        public void GlyphMapping_AllGlyphNames_DeriveToBasicLatin()
         {
             foreach (var kv in GlyphMapping.UnicodeToGlyphName)
             {
-                Assert.True(GlyphMapping.BaseCharForWidth.ContainsKey(kv.Key),
-                    $"Character U+{(int)kv.Key:X4} ({kv.Value}) has a glyph name but no base char for width");
-            }
-        }
-
-        [Fact]
-        public void GlyphMapping_AllBaseChars_AreBasicLatin()
-        {
-            foreach (var kv in GlyphMapping.BaseCharForWidth)
-            {
-                char baseChar = kv.Value;
+                char baseChar = (kv.Value == "dotlessi") ? 'i' : kv.Value[0];
                 Assert.True(baseChar >= 'A' && baseChar <= 'z',
-                    $"Base char for U+{(int)kv.Key:X4} is '{baseChar}' — expected basic Latin letter");
+                    $"Derived base char for U+{(int)kv.Key:X4} ({kv.Value}) is '{baseChar}' — expected basic Latin letter");
             }
         }
 

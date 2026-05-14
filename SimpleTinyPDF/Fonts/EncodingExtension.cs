@@ -12,7 +12,11 @@ namespace SimpleTinyPDF
     internal sealed class EncodingExtension
     {
         // Byte positions not used by WinAnsiEncoding: 1-31, 127, 129, 141, 143, 144, 157
-        private static readonly byte[] AvailableSlots = BuildAvailableSlots();
+        private static readonly byte[] AvailableSlots =
+        {
+            1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,
+            127,129,141,143,144,157
+        };
 
         private readonly Dictionary<char, byte> _assignments = new Dictionary<char, byte>();
         private int _nextIndex;
@@ -79,21 +83,5 @@ namespace SimpleTinyPDF
             return sb.ToString();
         }
 
-        private static byte[] BuildAvailableSlots()
-        {
-            var slots = new List<byte>();
-            // Codes 1-31: control character positions (unused in WinAnsiEncoding text)
-            for (byte i = 1; i <= 31; i++)
-                slots.Add(i);
-            // Code 127: DEL position
-            slots.Add(127);
-            // Undefined positions in the 0x80-0x9F range of WinAnsiEncoding
-            slots.Add(129); // 0x81
-            slots.Add(141); // 0x8D
-            slots.Add(143); // 0x8F
-            slots.Add(144); // 0x90
-            slots.Add(157); // 0x9D
-            return slots.ToArray();
-        }
     }
 }

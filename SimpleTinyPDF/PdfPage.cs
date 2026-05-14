@@ -106,7 +106,7 @@ namespace SimpleTinyPDF
             _content.AppendFormat("/{0} gs\n", gsId);
         }
 
-        private static string F(float v) => v.ToString("0.####", CultureInfo.InvariantCulture);
+        private static string F(float v) => PdfStringHelper.F(v);
 
         private static string ToRoman(int n)
         {

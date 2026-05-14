@@ -14,8 +14,8 @@ namespace SimpleTinyPDF
             if (code > 255 && PdfStringHelper.UnicodeToWinAnsi.TryGetValue(c, out byte winAnsi))
                 code = winAnsi;
             // Map extended European characters to their base character width
-            if (code > 255 && GlyphMapping.BaseCharForWidth.TryGetValue(c, out char baseChar))
-                code = (int)baseChar;
+            if (code > 255 && GlyphMapping.UnicodeToGlyphName.TryGetValue(c, out string glyphName))
+                code = (glyphName == "dotlessi") ? 'i' : glyphName[0];
             if (code < 0 || code > 255) return 500; // fallback for out-of-range
 
             switch (font)
@@ -401,7 +401,7 @@ namespace SimpleTinyPDF
         // ── Width arrays for standard 14 fonts (WinAnsiEncoding, codes 0-255) ──
         // Values are in 1/1000 of an em unit, sourced from Adobe AFM files.
 
-        private static readonly int[] HelveticaWidths = new int[256]
+        private static readonly ushort[] HelveticaWidths = new ushort[256]
         {
             // 0-31: control characters
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -436,7 +436,7 @@ namespace SimpleTinyPDF
             556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500
         };
 
-        private static readonly int[] HelveticaBoldWidths = new int[256]
+        private static readonly ushort[] HelveticaBoldWidths = new ushort[256]
         {
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -456,7 +456,7 @@ namespace SimpleTinyPDF
             611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556
         };
 
-        private static readonly int[] TimesRomanWidths = new int[256]
+        private static readonly ushort[] TimesRomanWidths = new ushort[256]
         {
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -476,7 +476,7 @@ namespace SimpleTinyPDF
             500,500,500,500,500,500,500,564,500,500,500,500,500,500,500,500
         };
 
-        private static readonly int[] TimesBoldWidths = new int[256]
+        private static readonly ushort[] TimesBoldWidths = new ushort[256]
         {
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -496,7 +496,7 @@ namespace SimpleTinyPDF
             500,556,500,500,500,500,500,570,500,556,556,556,556,500,556,500
         };
 
-        private static readonly int[] TimesItalicWidths = new int[256]
+        private static readonly ushort[] TimesItalicWidths = new ushort[256]
         {
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -516,7 +516,7 @@ namespace SimpleTinyPDF
             500,500,500,500,500,500,500,675,500,500,500,500,500,444,500,444
         };
 
-        private static readonly int[] TimesBoldItalicWidths = new int[256]
+        private static readonly ushort[] TimesBoldItalicWidths = new ushort[256]
         {
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -536,7 +536,7 @@ namespace SimpleTinyPDF
             500,556,500,500,500,500,500,570,500,556,556,556,556,444,500,444
         };
 
-        private static readonly int[] SymbolWidths = new int[256]
+        private static readonly ushort[] SymbolWidths = new ushort[256]
         {
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -556,7 +556,7 @@ namespace SimpleTinyPDF
             0,329,274,686,686,686,384,384,384,384,384,384,494,494,494,0
         };
 
-        private static readonly int[] ZapfDingbatsWidths = new int[256]
+        private static readonly ushort[] ZapfDingbatsWidths = new ushort[256]
         {
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
