@@ -149,15 +149,15 @@ namespace SimpleTinyPDF.Tests
         }
 
         [Fact]
-        public void DrawTextBox_WrapsText()
+        public void DrawText_WrapsText()
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            float endY = page.DrawTextBox(
+            float endY = page.DrawText(
                 "This is a paragraph of text that should wrap across multiple lines when drawn in a text box with limited width.",
-                50, 50, 200, PdfFont.Helvetica, 12);
+                50, 50, PdfFont.Helvetica, 12, width: 200);
 
-            Assert.True(endY > 50, "DrawTextBox should return Y after text");
+            Assert.True(endY > 50, "DrawText should return Y after text");
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "textbox_wrap");
@@ -181,15 +181,15 @@ namespace SimpleTinyPDF.Tests
         }
 
         [Fact]
-        public void DrawTextBox_ReturnsCorrectY_ForChaining()
+        public void DrawText_ReturnsCorrectY_ForChaining()
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             float y = 50;
-            y = page.DrawTextBox("First paragraph", 50, y, 400);
+            y = page.DrawText("First paragraph", 50, y, width: 400);
             float gap = 10;
             float secondStart = y + gap;
-            y = page.DrawTextBox("Second paragraph", 50, secondStart, 400);
+            y = page.DrawText("Second paragraph", 50, secondStart, width: 400);
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "textbox_chain");
@@ -207,7 +207,7 @@ namespace SimpleTinyPDF.Tests
         }
 
         [Fact]
-        public void DrawTextBox_RightAlignment_MultiLineAligns()
+        public void DrawText_RightAlignment_MultiLineAligns()
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
@@ -221,8 +221,8 @@ namespace SimpleTinyPDF.Tests
             // the same right edge rather than the same left edge.
             string text = "Short line\nThis is a medium length line\nLonger line that has more words in it\nTiny";
 
-            float endY = page.DrawTextBox(text, boxX, boxY, boxWidth,
-                PdfFont.Helvetica, fontSize, lineSpacing, alignment: TextAlignment.Right);
+            float endY = page.DrawText(text, boxX, boxY,
+                PdfFont.Helvetica, fontSize, alignment: TextAlignment.Right, width: boxWidth, lineSpacing: lineSpacing);
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "textbox_right_multiline");
@@ -348,13 +348,13 @@ namespace SimpleTinyPDF.Tests
         }
 
         [Fact]
-        public void DrawTextBox_Underline_RendersOnAllLines()
+        public void DrawText_Underline_RendersOnAllLines()
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            float endY = page.DrawTextBox(
+            float endY = page.DrawText(
                 "This is text that should wrap and each line should be underlined.",
-                50, 50, 200, PdfFont.Helvetica, 14, underline: true);
+                50, 50, PdfFont.Helvetica, 14, underline: true, width: 200);
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "textbox_underline");

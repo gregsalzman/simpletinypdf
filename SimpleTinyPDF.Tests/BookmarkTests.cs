@@ -161,21 +161,21 @@ namespace SimpleTinyPDF.Tests
 
                 // Add section headings on each page
                 pages[i].DrawText("Overview", 50, 120, PdfFont.HelveticaBold, 16);
-                pages[i].DrawTextBox(
+                pages[i].DrawText(
                     $"This is the overview section for {chapterTitles[i]}. " +
                     "It provides a high-level summary of the topics covered in this chapter.",
-                    50, 150, 495, PdfFont.Helvetica, 11, lineSpacing: 1.4f);
+                    50, 150, PdfFont.Helvetica, 11, width: 495, lineSpacing: 1.4f);
 
                 pages[i].DrawText("Details", 50, 300, PdfFont.HelveticaBold, 16);
-                pages[i].DrawTextBox(
+                pages[i].DrawText(
                     $"This section covers the detailed aspects of {chapterTitles[i]}. " +
                     "Each topic is explained with examples and best practices.",
-                    50, 330, 495, PdfFont.Helvetica, 11, lineSpacing: 1.4f);
+                    50, 330, PdfFont.Helvetica, 11, width: 495, lineSpacing: 1.4f);
 
                 pages[i].DrawText("Summary", 50, 500, PdfFont.HelveticaBold, 16);
-                pages[i].DrawTextBox(
+                pages[i].DrawText(
                     $"In summary, {chapterTitles[i]} is an essential part of the documentation.",
-                    50, 530, 495, PdfFont.Helvetica, 11, lineSpacing: 1.4f);
+                    50, 530, PdfFont.Helvetica, 11, width: 495, lineSpacing: 1.4f);
             }
 
             // Build bookmark hierarchy with nested sections

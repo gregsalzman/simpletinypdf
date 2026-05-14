@@ -114,16 +114,16 @@ page.DrawText("Bold red", 50, 70, PdfFont.HelveticaBold, 14, PdfColor.Red, TextA
 page.DrawText("Visit Example", 50, 90, PdfFont.Helvetica, 12, PdfColor.Blue,
     underline: true, link: "https://example.com");
 
-// Wrapped text box — returns Y position after last line
-float nextY = page.DrawTextBox("Long paragraph...", 50, 110, width: 400,
-    font: PdfFont.TimesRoman, fontSize: 11, lineSpacing: 1.4f);
+// Wrapped text — pass width to enable word wrap, returns Y after last line
+float nextY = page.DrawText("Long paragraph...", 50, 110,
+    PdfFont.TimesRoman, 11, width: 400, lineSpacing: 1.4f);
 
-// Wrapped text box with hyperlink (each wrapped line is clickable)
-float nextY1 = page.DrawTextBox("Click here for full terms and conditions", 50, 160, width: 200,
-    link: "https://example.com/terms");
+// Wrapped text with hyperlink (each wrapped line is clickable)
+float nextY1 = page.DrawText("Click here for full terms and conditions", 50, 160,
+    link: "https://example.com/terms", width: 200);
 
 // Rich text (mixed fonts/sizes/colors on one line)
-page.DrawRichText(new[] {
+page.DrawText(new[] {
     new TextSpan("Normal "),
     new TextSpan("bold", PdfFont.HelveticaBold),
     new TextSpan(" and ", PdfFont.Helvetica, 12, PdfColor.DarkGray),
@@ -131,33 +131,31 @@ page.DrawRichText(new[] {
 }, 50, 200);
 
 // Rich text with hyperlinks — individual spans can be links
-page.DrawRichText(new[] {
+page.DrawText(new[] {
     new TextSpan("See "),
     new TextSpan("our docs", PdfFont.Helvetica, 12, PdfColor.Blue,
         underline: true, link: "https://docs.example.com"),
     new TextSpan(" for details.")
 }, 50, 220);
 
-// Rich text box (mixed formatting with word wrap)
-float nextY2 = page.DrawRichTextBox(spans, 50, 240, width: 400);
+// Rich text with word wrap (pass width)
+float nextY2 = page.DrawText(spans, 50, 240, width: 400);
 
 // Measure text width
 float w = page.MeasureText("Hello", PdfFont.Helvetica, 12);
 
 // Rotated text — angle in degrees, clockwise
 page.DrawText("Rotated 45°", 300, 100, fontSize: 16, rotation: 45);
-page.DrawTextBox("Rotated text box", 300, 200, width: 150, rotation: 90);
+page.DrawText("Rotated text box", 300, 200, width: 150, rotation: 90);
 ```
 
 | Method | Returns | Description |
 |---|---|---|
-| `DrawText(...)` | void | Single line of text |
-| `DrawTextBox(...)` | float | Wrapped text; returns Y after last line |
-| `DrawRichText(...)` | void | Single line with mixed formatting |
-| `DrawRichTextBox(...)` | float | Wrapped mixed-format text |
+| `DrawText(string, ...)` | float | Text; pass `width` for word wrap. Returns Y after text |
+| `DrawText(spans, ...)` | float | Rich text (mixed formatting); pass `width` for word wrap |
 | `MeasureText(text, font, size)` | float | Width of text in points |
 
-**TextSpan** is used with `DrawRichText` and `DrawRichTextBox` for mixed-format text:
+**TextSpan** is used with the spans overload of `DrawText` for mixed-format text:
 
 ```csharp
 new TextSpan("hello")                                          // defaults: Helvetica 12pt black
@@ -206,7 +204,7 @@ The `scaleMode` parameter controls how the image is scaled to fit the target rec
 
 **Rotation**
 
-All drawing methods (`DrawText`, `DrawRichText`, `DrawTextBox`, `DrawRichTextBox`, `DrawImage`, `DrawLine`, `DrawRectangle`, `DrawFilledRectangle`) accept an optional `rotation` parameter:
+All drawing methods (`DrawText`, `DrawImage`, `DrawLine`, `DrawRectangle`, `DrawFilledRectangle`) accept an optional `rotation` parameter:
 
 - **Angle** is in degrees, clockwise (matching CSS convention)
 - **Origin** is the element's `(x, y)` position
@@ -652,7 +650,7 @@ If your project requires custom fonts or broad Unicode support, consider a full-
 
 | Version | Date | Changes |
 |---|---|---|
-| 0.53 | May 2026 | Add barcode and QR code support (Code 128, Code 39, EAN-13, UPC-A, QR Code) with vector rendering and configurable options |
+| 0.53 | May 2026 | Add barcode and QR code support (Code 128, Code 39, EAN-13, UPC-A, QR Code) with vector rendering and configurable options.  Also did some code reorganization and optimization. |
 | 0.52 | May 2026 | Add hierarchical lists with nesting, text wrapping, multi-page flow, and four list styles (Bullet, Numbered, RomanLower, RomanUpper) |
 | 0.51 | May 2026 | Add rotation support for text, images, and shapes |
 | 0.50 | April 2026 | Initial beta release |

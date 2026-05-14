@@ -251,8 +251,8 @@ namespace SimpleTinyPDF
                     if (ColumnAlignments.ContainsKey(i))
                         align = ColumnAlignments[i];
 
-                    page.DrawTextBox(cellText, textX, textY, textWidth,
-                        font, fontSize, LineSpacing, textColor, align);
+                    page.DrawText(cellText, textX, textY, font, fontSize,
+                        textColor, align, width: textWidth, lineSpacing: LineSpacing);
                 }
 
                 currentX += colWidth;

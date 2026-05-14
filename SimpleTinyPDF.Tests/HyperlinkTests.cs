@@ -100,14 +100,14 @@ namespace SimpleTinyPDF.Tests
             bitmap.Dispose();
         }
 
-        // ── DrawRichText with link ───────────────────────────────
+        // ── DrawText (rich) with link ─────────────────────────────
 
         [Fact]
         public void DrawRichText_SpanWithLink_ProducesAnnotation()
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichText(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("See "),
                 new TextSpan("docs", PdfFont.Helvetica, 12, PdfColor.Blue,
@@ -125,7 +125,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichText(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Link1", link: "https://one.com"),
                 new TextSpan(" "),
@@ -142,7 +142,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichText(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Hello "),
                 new TextSpan("world")
@@ -152,15 +152,15 @@ namespace SimpleTinyPDF.Tests
             Assert.DoesNotContain("/Annots", pdf);
         }
 
-        // ── DrawTextBox with link ────────────────────────────────
+        // ── DrawText (text box) with link ────────────────────────
 
         [Fact]
         public void DrawTextBox_WithLink_ProducesAnnotation()
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawTextBox("Click here for details", 50, 50, 200,
-                link: "https://example.com");
+            page.DrawText("Click here for details", 50, 50,
+                link: "https://example.com", width: 200);
             var pdf = GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
@@ -173,9 +173,9 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             // Use a narrow width to force wrapping
-            page.DrawTextBox(
+            page.DrawText(
                 "This is a long text that should wrap across multiple lines in the text box",
-                50, 50, 80, PdfFont.Helvetica, 12, link: "https://example.com");
+                50, 50, PdfFont.Helvetica, 12, link: "https://example.com", width: 80);
             var pdf = GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
@@ -195,26 +195,26 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawTextBox("No link text", 50, 50, 200);
+            page.DrawText("No link text", 50, 50, width: 200);
             var pdf = GetPdfText(doc.ToArray());
 
             Assert.DoesNotContain("/Annots", pdf);
         }
 
-        // ── DrawRichTextBox with link ────────────────────────────
+        // ── DrawText (rich text box) with link ────────────────────
 
         [Fact]
         public void DrawRichTextBox_SpanWithLink_ProducesAnnotation()
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichTextBox(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Read the "),
                 new TextSpan("documentation", PdfFont.Helvetica, 12, PdfColor.Blue,
                     underline: true, link: "https://docs.example.com"),
                 new TextSpan(" for more.")
-            }, 50, 50, 400);
+            }, 50, 50, width: 400);
             var pdf = GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
@@ -226,12 +226,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichTextBox(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Normal text "),
                 new TextSpan("linked text", link: "https://example.com"),
                 new TextSpan(" more normal text")
-            }, 50, 50, 400);
+            }, 50, 50, width: 400);
             var pdf = GetPdfText(doc.ToArray());
 
             Assert.Contains("https://example.com", pdf);
@@ -252,11 +252,11 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             // Use narrow width to force wrapping within the linked span
-            page.DrawRichTextBox(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("This linked text should wrap across lines", PdfFont.Helvetica, 12,
                     PdfColor.Blue, underline: true, link: "https://example.com")
-            }, 50, 50, 100);
+            }, 50, 50, width: 100);
             var pdf = GetPdfText(doc.ToArray());
 
             Assert.Contains("https://example.com", pdf);
@@ -297,8 +297,8 @@ namespace SimpleTinyPDF.Tests
             page.DrawText("Visit Example", 50, 50, PdfFont.Helvetica, 14,
                 PdfColor.Blue, underline: true, link: "https://example.com");
 
-            // DrawRichText with link
-            page.DrawRichText(new[]
+            // DrawText (rich) with link
+            page.DrawText(new[]
             {
                 new TextSpan("See "),
                 new TextSpan("GitHub", PdfFont.HelveticaBold, 12, PdfColor.Blue,
@@ -306,12 +306,12 @@ namespace SimpleTinyPDF.Tests
                 new TextSpan(" for code.")
             }, 50, 80);
 
-            // DrawTextBox with link
-            page.DrawTextBox("Click for full terms and conditions", 50, 110, 150,
-                PdfFont.Helvetica, 10, link: "https://example.com/terms");
+            // DrawText (text box) with link
+            page.DrawText("Click for full terms and conditions", 50, 110,
+                PdfFont.Helvetica, 10, link: "https://example.com/terms", width: 150);
 
-            // DrawRichTextBox with mixed links
-            page.DrawRichTextBox(new[]
+            // DrawText (rich text box) with mixed links
+            page.DrawText(new[]
             {
                 new TextSpan("Contact us at "),
                 new TextSpan("support@example.com", PdfFont.Helvetica, 11, PdfColor.Blue,
@@ -320,7 +320,7 @@ namespace SimpleTinyPDF.Tests
                 new TextSpan("help page", PdfFont.Helvetica, 11, PdfColor.Blue,
                     underline: true, link: "https://help.example.com"),
                 new TextSpan(".")
-            }, 50, 180, 300);
+            }, 50, 180, width: 300);
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "links_mixed");

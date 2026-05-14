@@ -272,8 +272,8 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage();
-            page.DrawTextBox("Zażółć gęślą jaźń — to jest pangram języka polskiego.",
-                50, 50, 200);
+            page.DrawText("Zażółć gęślą jaźń — to jest pangram języka polskiego.",
+                50, 50, width: 200);
 
             using var ms = new MemoryStream();
             doc.Save(ms);
@@ -349,11 +349,11 @@ namespace SimpleTinyPDF.Tests
             // TextBox wrapping test
             page.DrawText("Text Box Wrapping", 50, y, PdfFont.HelveticaBold, 14);
             y += 25;
-            page.DrawTextBox(
+            page.DrawText(
                 "Zażółć gęślą jaźń — to jest pangram języka polskiego. " +
                 "Příliš žluťoučký kůň úpěl ďábelské ódy — to je český pangram. " +
                 "Árvíztűrő tükörfúrógép — ez a magyar pangram.",
-                50, y, 300);
+                50, y, width: 300);
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "european_languages");

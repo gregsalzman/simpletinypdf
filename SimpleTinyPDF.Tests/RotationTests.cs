@@ -236,12 +236,12 @@ namespace SimpleTinyPDF.Tests
         }
 
         [Fact]
-        public void DrawTextBox_Rotated90_RendersVerticalTextBlock()
+        public void DrawText_TextBox_Rotated90_RendersVerticalTextBlock()
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawTextBox("This is a wrapped text box that should be rotated.",
-                200, 100, 150, fontSize: 12, rotation: 90);
+            page.DrawText("This is a wrapped text box that should be rotated.",
+                200, 100, fontSize: 12, rotation: 90, width: 150);
             var bytes = doc.ToArray();
 
             TestHelper.SavePdf(bytes, "rotation_textbox_90");
@@ -285,7 +285,7 @@ namespace SimpleTinyPDF.Tests
                 new TextSpan("Bold ", PdfFont.HelveticaBold, 14),
                 new TextSpan("Normal", PdfFont.Helvetica, 14, PdfColor.Red)
             };
-            page.DrawRichText(spans, 200, 200, rotation: 90);
+            page.DrawText(spans, 200, 200, rotation: 90);
             var bytes = doc.ToArray();
 
             TestHelper.SavePdf(bytes, "rotation_richtext_90");

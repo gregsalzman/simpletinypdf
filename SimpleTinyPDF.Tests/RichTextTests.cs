@@ -50,14 +50,14 @@ namespace SimpleTinyPDF.Tests
             Assert.Equal(PdfColor.Red, span.Color);
         }
 
-        // ── DrawRichText (single line) ───────────────────────────
+        // ── DrawText (single line, from spans) ──────────────────────
 
         [Fact]
         public void DrawRichText_SingleSpan_RendersText()
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichText(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Hello World", PdfFont.Helvetica, 24)
             }, 50, 50);
@@ -77,7 +77,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichText(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Normal ", PdfFont.Helvetica, 14),
                 new TextSpan("Bold ", PdfFont.HelveticaBold, 14),
@@ -98,7 +98,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichText(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Red ", PdfFont.HelveticaBold, 36, PdfColor.Red),
                 new TextSpan("Blue", PdfFont.HelveticaBold, 36, PdfColor.Blue)
@@ -135,7 +135,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichText(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Big ", PdfFont.Helvetica, 36),
                 new TextSpan("small", PdfFont.Helvetica, 10)
@@ -155,7 +155,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichText(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Center ", PdfFont.Helvetica, 20),
                 new TextSpan("Text", PdfFont.HelveticaBold, 20)
@@ -176,15 +176,15 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichText(new TextSpan[] { }, 50, 50);
-            page.DrawRichText(new[] { new TextSpan("") }, 50, 50);
-            page.DrawRichText(null, 50, 50);
+            page.DrawText(new TextSpan[] { }, 50, 50);
+            page.DrawText(new[] { new TextSpan("") }, 50, 50);
+            page.DrawText((TextSpan[])null, 50, 50);
             var bytes = doc.ToArray();
             Assert.NotNull(bytes);
             Assert.True(bytes.Length > 0);
         }
 
-        // ── DrawRichTextBox (multi-line, wrapped) ────────────────
+        // ── DrawText with width (multi-line, wrapped) ────────────
 
         [Fact]
         public void DrawRichTextBox_SingleSpan_WrapsText()
@@ -192,12 +192,12 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             string text = "This is a paragraph of text that should wrap across multiple lines when drawn in a text box.";
-            float endY = page.DrawRichTextBox(new[]
+            float endY = page.DrawText(new[]
             {
                 new TextSpan(text, PdfFont.Helvetica, 12)
-            }, 50, 50, 200);
+            }, 50, 50, width: 200);
 
-            Assert.True(endY > 50, "DrawRichTextBox should return Y after text");
+            Assert.True(endY > 50, "DrawText should return Y after text");
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "richtextbox_single_span");
@@ -214,12 +214,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            float endY = page.DrawRichTextBox(new[]
+            float endY = page.DrawText(new[]
             {
                 new TextSpan("This is ", PdfFont.Helvetica, 12),
                 new TextSpan("bold text ", PdfFont.HelveticaBold, 12),
                 new TextSpan("followed by normal text that should wrap across multiple lines.", PdfFont.Helvetica, 12)
-            }, 50, 50, 200);
+            }, 50, 50, width: 200);
 
             Assert.True(endY > 50);
             var bytes = doc.ToArray();
@@ -241,11 +241,11 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            float endY = page.DrawRichTextBox(new[]
+            float endY = page.DrawText(new[]
             {
                 new TextSpan("Big ", PdfFont.Helvetica, 30),
                 new TextSpan("and small text that wraps.", PdfFont.Helvetica, 10)
-            }, 50, 50, 200);
+            }, 50, 50, width: 200);
 
             Assert.True(endY > 50);
             var bytes = doc.ToArray();
@@ -262,11 +262,11 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichTextBox(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Red text ", PdfFont.HelveticaBold, 24, PdfColor.Red),
                 new TextSpan("and blue text", PdfFont.HelveticaBold, 24, PdfColor.Blue)
-            }, 50, 50, 400);
+            }, 50, 50, width: 400);
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "richtextbox_colors");
@@ -289,10 +289,10 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            float endY = page.DrawRichTextBox(new[]
+            float endY = page.DrawText(new[]
             {
                 new TextSpan("Line one\nLine two\nLine three", PdfFont.Helvetica, 12)
-            }, 50, 50, 400);
+            }, 50, 50, width: 400);
 
             float lineHeight = 12 * 1.2f;
             int linesRendered = (int)((endY - 50) / lineHeight + 0.5f);
@@ -318,11 +318,11 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             float boxX = 100, boxWidth = 300;
-            page.DrawRichTextBox(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Short\n", PdfFont.Helvetica, 14),
                 new TextSpan("A longer line of text", PdfFont.Helvetica, 14)
-            }, boxX, 50, boxWidth, alignment: TextAlignment.Right);
+            }, boxX, 50, TextAlignment.Right, width: boxWidth);
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "richtextbox_right");
@@ -347,18 +347,18 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             float y = 50;
-            y = page.DrawRichTextBox(new[]
+            y = page.DrawText(new[]
             {
                 new TextSpan("First ", PdfFont.Helvetica, 12),
                 new TextSpan("paragraph", PdfFont.HelveticaBold, 12)
-            }, 50, y, 400);
+            }, 50, y, width: 400);
 
             float gap = 10;
             y += gap;
-            y = page.DrawRichTextBox(new[]
+            y = page.DrawText(new[]
             {
                 new TextSpan("Second paragraph", PdfFont.Helvetica, 12)
-            }, 50, y, 400);
+            }, 50, y, width: 400);
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "richtextbox_chain");
@@ -374,10 +374,10 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            float result = page.DrawRichTextBox(new TextSpan[] { }, 50, 100, 400);
+            float result = page.DrawText(new TextSpan[] { }, 50, 100, width: 400);
             Assert.Equal(100, result);
 
-            result = page.DrawRichTextBox(null, 50, 100, 400);
+            result = page.DrawText((TextSpan[])null, 50, 100, width: 400);
             Assert.Equal(100, result);
         }
 
@@ -388,7 +388,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichText(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("It's a ", PdfFont.Helvetica, 12),
                 new TextSpan("pleasure ", PdfFont.CourierBold, 7, PdfColor.Red),
@@ -409,12 +409,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            float endY = page.DrawRichTextBox(new[]
+            float endY = page.DrawText(new[]
             {
                 new TextSpan("It's a ", PdfFont.Helvetica, 12),
                 new TextSpan("pleasure ", PdfFont.CourierBold, 7, PdfColor.Red),
                 new TextSpan("to meet you.", PdfFont.TimesRoman, 16, PdfColor.Rgb(1f, 1f, 0f))
-            }, 50, 50, 300);
+            }, 50, 50, width: 300);
 
             Assert.True(endY > 50);
             var bytes = doc.ToArray();
@@ -447,7 +447,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichText(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Normal ", PdfFont.Helvetica, 24),
                 new TextSpan("Underlined", PdfFont.Helvetica, 24, underline: true)
@@ -472,10 +472,10 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            float endY = page.DrawRichTextBox(new[]
+            float endY = page.DrawText(new[]
             {
                 new TextSpan("This underlined text should wrap across lines.", PdfFont.Helvetica, 14, underline: true)
-            }, 50, 50, 200);
+            }, 50, 50, width: 200);
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "richtextbox_underline");
@@ -502,11 +502,11 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
-            page.DrawRichTextBox(new[]
+            page.DrawText(new[]
             {
                 new TextSpan("Normal ", PdfFont.Helvetica, 24),
                 new TextSpan("Underlined", PdfFont.Helvetica, 24, underline: true)
-            }, 50, 50, 500);
+            }, 50, 50, width: 500);
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "richtextbox_partial_underline");

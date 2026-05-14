@@ -35,12 +35,12 @@ namespace SimpleTinyPDF.Tests
 
             // Company info
             float y = 95;
-            y = page.DrawTextBox("Acme Corporation\n123 Business Ave\nSeattle, WA 98101", 50, y, 250,
-                PdfFont.Helvetica, 10, color: PdfColor.DarkGray);
+            y = page.DrawText("Acme Corporation\n123 Business Ave\nSeattle, WA 98101", 50, y,
+                PdfFont.Helvetica, 10, color: PdfColor.DarkGray, width: 250);
 
             // Client info
-            page.DrawTextBox("Bill To:\nJane Smith\n456 Client Street\nPortland, OR 97201", 350, 95, 195,
-                PdfFont.Helvetica, 10, color: PdfColor.DarkGray);
+            page.DrawText("Bill To:\nJane Smith\n456 Client Street\nPortland, OR 97201", 350, 95,
+                PdfFont.Helvetica, 10, color: PdfColor.DarkGray, width: 195);
 
             y += 20;
 
@@ -133,10 +133,10 @@ namespace SimpleTinyPDF.Tests
             page1.DrawText("Q4 2025", 50, 75, PdfFont.Helvetica, 18, PdfColor.Rgb(200, 200, 255));
 
             float y = 120;
-            y = page1.DrawTextBox(
+            y = page1.DrawText(
                 "This report summarizes the key performance metrics and financial results for the fourth quarter of 2025. " +
                 "All divisions showed strong growth compared to the previous quarter.",
-                50, y, 495, PdfFont.Helvetica, 11, 1.4f);
+                50, y, PdfFont.Helvetica, 11, width: 495, lineSpacing: 1.4f);
 
             y += 20;
             page1.DrawText("Key Highlights:", 50, y, PdfFont.HelveticaBold, 14);

@@ -113,20 +113,20 @@ namespace SimpleTinyPDF.Tests
         }
 
         [Fact]
-        public void DrawTextBox_HalfOpacity_IsLighterThanFullOpacity()
+        public void DrawText_TextBox_HalfOpacity_IsLighterThanFullOpacity()
         {
             var doc1 = new PdfDocument();
             var page1 = doc1.AddPage(PageSize.A4);
-            page1.DrawTextBox("Semi transparent text box content here", 50, 50, 300,
-                PdfFont.Helvetica, 24);
+            page1.DrawText("Semi transparent text box content here", 50, 50,
+                PdfFont.Helvetica, 24, width: 300);
             var bytes1 = doc1.ToArray();
             TestHelper.SavePdf(bytes1, "opacity_textbox_full");
             var bmp1 = TestHelper.RasterizePage(bytes1, "opacity_textbox_full");
 
             var doc2 = new PdfDocument();
             var page2 = doc2.AddPage(PageSize.A4);
-            page2.DrawTextBox("Semi transparent text box content here", 50, 50, 300,
-                PdfFont.Helvetica, 24, opacity: 0.3f);
+            page2.DrawText("Semi transparent text box content here", 50, 50,
+                PdfFont.Helvetica, 24, opacity: 0.3f, width: 300);
             var bytes2 = doc2.ToArray();
             TestHelper.SavePdf(bytes2, "opacity_textbox_030");
             var bmp2 = TestHelper.RasterizePage(bytes2, "opacity_textbox_030");
@@ -214,7 +214,7 @@ namespace SimpleTinyPDF.Tests
             // Render with second span at full opacity as baseline
             var doc1 = new PdfDocument();
             var page1 = doc1.AddPage(PageSize.A4);
-            page1.DrawRichText(new[]
+            page1.DrawText(new[]
             {
                 new TextSpan("AA ", PdfFont.Helvetica, 36, PdfColor.Black, opacity: 1f),
                 new TextSpan("BB", PdfFont.Helvetica, 36, PdfColor.Black, opacity: 1f)
@@ -226,7 +226,7 @@ namespace SimpleTinyPDF.Tests
             // Render with second span at half opacity
             var doc2 = new PdfDocument();
             var page2 = doc2.AddPage(PageSize.A4);
-            page2.DrawRichText(new[]
+            page2.DrawText(new[]
             {
                 new TextSpan("AA ", PdfFont.Helvetica, 36, PdfColor.Black, opacity: 1f),
                 new TextSpan("BB", PdfFont.Helvetica, 36, PdfColor.Black, opacity: 0.5f)
@@ -254,7 +254,7 @@ namespace SimpleTinyPDF.Tests
         }
 
         [Fact]
-        public void DrawRichTextBox_WithOpacity_RendersVisibly()
+        public void DrawText_RichTextBox_WithOpacity_RendersVisibly()
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
@@ -264,7 +264,7 @@ namespace SimpleTinyPDF.Tests
                 new TextSpan("Opaque part ", PdfFont.Helvetica, 18, PdfColor.Black, opacity: 1f),
                 new TextSpan("translucent part", PdfFont.Helvetica, 18, PdfColor.Black, opacity: 0.4f)
             };
-            page.DrawRichTextBox(spans, 50, 50, 300);
+            page.DrawText(spans, 50, 50, width: 300);
 
             var bytes = doc.ToArray();
             TestHelper.SavePdf(bytes, "opacity_richtextbox");

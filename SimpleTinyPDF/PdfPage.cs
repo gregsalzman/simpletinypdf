@@ -167,15 +167,98 @@ namespace SimpleTinyPDF
         // ── Text ──────────────────────────────────────────────────
 
         /// <summary>
-        /// Draws a single line of text at the specified position.
+        /// Draws text at the specified position. When <paramref name="width"/> is specified,
+        /// text wraps within that width. Returns the Y position after the rendered text.
         /// </summary>
-        public void DrawText(string text, float x, float y,
+        public float DrawText(string text, float x, float y,
             PdfFont font = PdfFont.Helvetica, float fontSize = 12f,
             PdfColor? color = null, TextAlignment alignment = TextAlignment.Left,
             bool underline = false, float opacity = 1f,
-            string link = null, float rotation = 0f)
+            string link = null, float rotation = 0f,
+            float? width = null, float lineSpacing = 1.2f)
         {
-            if (string.IsNullOrEmpty(text)) return;
+            if (string.IsNullOrEmpty(text)) return y;
+
+            if (width.HasValue)
+                return DrawTextBoxCore(text, x, y, width.Value, font, fontSize,
+                    lineSpacing, color, alignment, underline, opacity, link, rotation);
+
+            DrawTextCore(text, x, y, font, fontSize, color, alignment,
+                underline, opacity, link, rotation);
+
+            bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;
+            return topDown ? y + fontSize * lineSpacing : y - fontSize * lineSpacing;
+        }
+
+        /// <summary>
+        /// Draws rich text (mixed-format spans) at the specified position. When
+        /// <paramref name="width"/> is specified, text wraps within that width.
+        /// Returns the Y position after the rendered text.
+        /// </summary>
+        public float DrawText(IEnumerable<TextSpan> spans, float x, float y,
+            TextAlignment alignment = TextAlignment.Left, float rotation = 0f,
+            float? width = null, float lineSpacing = 1.2f)
+        {
+            if (spans == null) return y;
+
+            if (width.HasValue)
+                return DrawRichTextBoxCore(spans, x, y, width.Value, lineSpacing,
+                    alignment, rotation);
+
+            float maxFontSize = 0;
+            var spanList = new List<TextSpan>();
+            foreach (var s in spans)
+            {
+                if (s != null && !string.IsNullOrEmpty(s.Text))
+                {
+                    spanList.Add(s);
+                    if (s.FontSize > maxFontSize) maxFontSize = s.FontSize;
+                }
+            }
+            if (spanList.Count == 0) return y;
+            if (maxFontSize <= 0) maxFontSize = 12f;
+
+            DrawRichTextCore(spanList, x, y, alignment, rotation);
+
+            bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;
+            return topDown ? y + maxFontSize * lineSpacing : y - maxFontSize * lineSpacing;
+        }
+
+        /// <summary>Draws text wrapped within a box. Returns the Y position after the last line.</summary>
+        [Obsolete("Use DrawText with the width parameter instead. Example: DrawText(text, x, y, width: 400)")]
+        public float DrawTextBox(string text, float x, float y, float width,
+            PdfFont font = PdfFont.Helvetica, float fontSize = 12f,
+            float lineSpacing = 1.2f, PdfColor? color = null,
+            TextAlignment alignment = TextAlignment.Left, bool underline = false,
+            float opacity = 1f, string link = null, float rotation = 0f)
+        {
+            return DrawText(text, x, y, font, fontSize, color, alignment,
+                underline, opacity, link, rotation, width, lineSpacing);
+        }
+
+        /// <summary>Draws a single line of mixed-format text.</summary>
+        [Obsolete("Use the DrawText overload that accepts IEnumerable<TextSpan> instead.")]
+        public float DrawRichText(IEnumerable<TextSpan> spans, float x, float y,
+            TextAlignment alignment = TextAlignment.Left, float rotation = 0f)
+        {
+            return DrawText(spans, x, y, alignment, rotation);
+        }
+
+        /// <summary>Draws mixed-format text wrapped within a box.</summary>
+        [Obsolete("Use the DrawText overload that accepts IEnumerable<TextSpan> with the width parameter instead.")]
+        public float DrawRichTextBox(IEnumerable<TextSpan> spans, float x, float y,
+            float width, float lineSpacing = 1.2f,
+            TextAlignment alignment = TextAlignment.Left, float rotation = 0f)
+        {
+            return DrawText(spans, x, y, alignment, rotation, width, lineSpacing);
+        }
+
+        private void DrawTextCore(string text, float x, float y,
+            PdfFont font, float fontSize,
+            PdfColor? color, TextAlignment alignment,
+            bool underline, float opacity,
+            string link, float rotation)
+        {
             var c = color ?? PdfColor.Black;
             var fontId = EnsureFont(font);
             float pdfY = CoordinateOrigin == CoordinateOrigin.TopDown
@@ -202,30 +285,19 @@ namespace SimpleTinyPDF
             AddLinkAnnotation(link, drawX, pdfY, MeasureText(text, font, fontSize), fontSize);
         }
 
-        /// <summary>
-        /// Draws a single line of mixed-format text at the specified position.
-        /// Each TextSpan can have its own font, font size, and color.
-        /// </summary>
-        public void DrawRichText(IEnumerable<TextSpan> spans, float x, float y,
-            TextAlignment alignment = TextAlignment.Left, float rotation = 0f)
+        private void DrawRichTextCore(IReadOnlyList<TextSpan> spanList, float x, float y,
+            TextAlignment alignment, float rotation)
         {
-            if (spans == null) return;
-
-            var spanList = new List<TextSpan>();
             float totalWidth = 0;
             float maxFontSize = 0;
             bool hasUnderline = false;
-            foreach (var span in spans)
+            foreach (var span in spanList)
             {
-                if (string.IsNullOrEmpty(span.Text)) continue;
-                spanList.Add(span);
                 totalWidth += MeasureText(span.Text, span.Font, span.FontSize);
                 if (span.FontSize > maxFontSize)
                     maxFontSize = span.FontSize;
                 if (span.Underline) hasUnderline = true;
             }
-
-            if (spanList.Count == 0) return;
 
             float drawX = x;
             if (alignment == TextAlignment.Center)
@@ -309,16 +381,12 @@ namespace SimpleTinyPDF
             }
         }
 
-        /// <summary>
-        /// Draws text wrapped within a box. Returns the Y position after the last line.
-        /// </summary>
-        public float DrawTextBox(string text, float x, float y, float width,
-            PdfFont font = PdfFont.Helvetica, float fontSize = 12f,
-            float lineSpacing = 1.2f, PdfColor? color = null,
-            TextAlignment alignment = TextAlignment.Left, bool underline = false,
-            float opacity = 1f, string link = null, float rotation = 0f)
+        private float DrawTextBoxCore(string text, float x, float y, float width,
+            PdfFont font, float fontSize,
+            float lineSpacing, PdfColor? color,
+            TextAlignment alignment, bool underline,
+            float opacity, string link, float rotation)
         {
-            if (string.IsNullOrEmpty(text)) return y;
             var c = color ?? PdfColor.Black;
             var fontId = EnsureFont(font);
             float lineHeight = fontSize * lineSpacing;
@@ -370,16 +438,10 @@ namespace SimpleTinyPDF
             return currentY;
         }
 
-        /// <summary>
-        /// Draws mixed-format text wrapped within a box. Each TextSpan can have its own
-        /// font, font size, and color. Returns the Y position after the last line.
-        /// </summary>
-        public float DrawRichTextBox(IEnumerable<TextSpan> spans, float x, float y,
-            float width, float lineSpacing = 1.2f,
-            TextAlignment alignment = TextAlignment.Left, float rotation = 0f)
+        private float DrawRichTextBoxCore(IEnumerable<TextSpan> spans, float x, float y,
+            float width, float lineSpacing,
+            TextAlignment alignment, float rotation)
         {
-            if (spans == null) return y;
-
             // Filter out empty spans before wrapping
             var spanList = new List<TextSpan>();
             foreach (var s in spans)
@@ -647,8 +709,8 @@ namespace SimpleTinyPDF
                 }
 
                 // Draw item text (handles wrapping internally)
-                y = currentPage.DrawTextBox(item.Text, x + indentPerLevel, y, textWidth,
-                    font, fontSize, lineSpacing, color);
+                y = currentPage.DrawText(item.Text, x + indentPerLevel, y,
+                    font, fontSize, color, width: textWidth, lineSpacing: lineSpacing);
 
                 // Gap between items
                 y += sign * fontSize * 0.3f;
