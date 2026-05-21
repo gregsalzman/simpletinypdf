@@ -24,7 +24,7 @@ namespace SimpleTinyPDF
         public bool ShowText { get; set; }
 
         /// <summary>Font for the human-readable text. Default: Courier.</summary>
-        public PdfFont TextFont { get; set; } = PdfFont.Courier;
+        public PdfFontSource TextFont { get; set; } = PdfFont.Courier;
 
         /// <summary>Font size for the human-readable text. Default: 8.</summary>
         public float TextFontSize { get; set; } = 8f;

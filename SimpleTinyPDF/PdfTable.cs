@@ -15,13 +15,13 @@ namespace SimpleTinyPDF
         internal readonly Dictionary<int, TextAlignment> ColumnAlignments = new Dictionary<int, TextAlignment>();
 
         /// <summary>Font for header cells. Default: HelveticaBold.</summary>
-        public PdfFont HeaderFont { get; set; } = PdfFont.HelveticaBold;
+        public PdfFontSource HeaderFont { get; set; } = PdfFont.HelveticaBold;
 
         /// <summary>Font size for header cells. Default: 10.</summary>
         public float HeaderFontSize { get; set; } = 10f;
 
         /// <summary>Font for body cells. Default: Helvetica.</summary>
-        public PdfFont CellFont { get; set; } = PdfFont.Helvetica;
+        public PdfFontSource CellFont { get; set; } = PdfFont.Helvetica;
 
         /// <summary>Font size for body cells. Default: 10.</summary>
         public float CellFontSize { get; set; } = 10f;
@@ -200,7 +200,7 @@ namespace SimpleTinyPDF
             return currentY;
         }
 
-        private float CalculateRowHeight(string[] cells, PdfFont font, float fontSize)
+        private float CalculateRowHeight(string[] cells, PdfFontSource font, float fontSize)
         {
             float maxHeight = 0;
             for (int i = 0; i < cells.Length && i < ColumnWidths.Length; i++)

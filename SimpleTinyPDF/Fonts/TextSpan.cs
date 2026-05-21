@@ -12,7 +12,7 @@ namespace SimpleTinyPDF
         public string Text { get; }
 
         /// <summary>The font for this span.</summary>
-        public PdfFont Font { get; }
+        public PdfFontSource Font { get; }
 
         /// <summary>The font size in points for this span.</summary>
         public float FontSize { get; }
@@ -32,12 +32,12 @@ namespace SimpleTinyPDF
         /// <summary>
         /// Creates a new text span with the specified formatting.
         /// </summary>
-        public TextSpan(string text, PdfFont font = PdfFont.Helvetica,
+        public TextSpan(string text, PdfFontSource font = null,
             float fontSize = 12f, PdfColor? color = null, bool underline = false,
             float opacity = 1f, string link = null)
         {
             Text = text ?? string.Empty;
-            Font = font;
+            Font = font ?? (PdfFontSource)PdfFont.Helvetica;
             FontSize = fontSize;
             Color = color ?? PdfColor.Black;
             Underline = underline;

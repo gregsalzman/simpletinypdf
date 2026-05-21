@@ -14,7 +14,7 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 - **Shapes** — lines, rectangles (stroke and/or fill)
 - **Rotation** — rotate any text, image, or shape element by an arbitrary angle
 - **Bookmarks** — hierarchical outline / table of contents
-- **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) with extended European character support
+- **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) plus TrueType (.ttf) and OpenType (.otf) font embedding with full Unicode support including supplementary planes (CJK, Cyrillic, Greek, Arabic, CJK Extension B, enclosed alphanumerics, etc.)
 - **Colors** — RGB, CMYK, and grayscale
 - **Page sizes** — A3, A4, A5, Letter, Legal, custom dimensions, landscape
 - **Coordinates** — top-down (default) or native PDF bottom-up
@@ -33,8 +33,7 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 **Look elsewhere if you need:**
 
 - HTML-to-PDF conversion
-- Fonts beyond the 14 standard PDF fonts (no TrueType/OpenType embedding)
-- Full Unicode or CJK character support
+- Right-to-left text layout (Arabic, Hebrew) or complex script shaping
 - Form fields or annotations
 - PDF reading, parsing, or editing
 - Encryption or digital signatures
@@ -46,11 +45,11 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~92 KB** | **~92 KB** | **1x** | No |
-| **PDFsharp** 6.2.4 | ~4.4 MB | ~4.5 MB | 49x | No |
-| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 163x | No (BouncyCastle ~8 MB) |
-| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 391x | Yes (bundled Skia) |
-| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 2,700x | Yes (bundled Chromium) |
+| **SimpleTinyPDF** | **~101 KB** | **~101 KB** | **1x** | No |
+| **PDFsharp** 6.2.4 | ~4.4 MB | ~4.5 MB | 45x | No |
+| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 149x | No (BouncyCastle ~8 MB) |
+| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 356x | Yes (bundled Skia) |
+| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 2,475x | Yes (bundled Chromium) |
 
 IronPDF's footprint includes the Chromium rendering engine downloaded at build/runtime. QuestPDF bundles custom Skia native binaries for cross-platform rendering.
 
@@ -164,6 +163,8 @@ new TextSpan("fancy", PdfFont.TimesItalic, 12, PdfColor.Blue, underline: true, o
 new TextSpan("click me", PdfFont.Helvetica, 12, PdfColor.Blue, underline: true,
     link: "https://example.com")                               // hyperlink
 ```
+
+**Custom Fonts (TrueType / OpenType)** — Load `.ttf` / `.otf` files via `PdfFontSource.FromFile()` and use them anywhere a built-in font is accepted. Full Unicode support including CJK, Cyrillic, and supplementary planes. See [Fonts](#fonts) for details and examples.
 
 **TextAlignment:** `TextAlignment.Left` (default), `TextAlignment.Center`, `TextAlignment.Right`
 
@@ -617,11 +618,11 @@ page.DrawTable(table, 50, 100, bottomMargin: 50, continuationY: 50);
 doc.Save("sales-report.pdf");
 ```
 
-## Font Limitations
+## Fonts
 
-SimpleTinyPDF uses the 14 standard PDF Type 1 fonts. These fonts are built into every PDF viewer and require no embedding, which keeps the library simple and output files small.
+### Built-in Fonts
 
-**Available font families:**
+SimpleTinyPDF includes the 14 standard PDF Type 1 fonts. These are built into every PDF viewer and require no embedding, keeping output files small.
 
 | Family | Variants |
 |---|---|
@@ -631,26 +632,68 @@ SimpleTinyPDF uses the 14 standard PDF Type 1 fonts. These fonts are built into 
 | Symbol | (symbol characters) |
 | ZapfDingbats | (decorative symbols) |
 
-**Character support:**
+Use them via the `PdfFont` enum:
 
-- Full WinAnsiEncoding coverage (standard Latin characters, digits, punctuation)
-- Extended European characters including Polish, Czech, Slovak, and Hungarian diacritics (e.g. ą, ć, ę, ł, ň, ř, š, ž, ő, ű)
-- Characters not in the supported set are replaced with a fallback; they will not cause an error but may not render as expected
+```csharp
+page.DrawText("Hello", 50, 50, PdfFont.HelveticaBold, 14);
+```
 
-**What is not supported:**
+### Custom Fonts (TrueType / OpenType)
 
-- Custom font embedding (TrueType, OpenType, WOFF)
+Load any `.ttf` or `.otf` font file and use it anywhere a built-in font is accepted. The font binary is embedded in the PDF using CID (composite) fonts with Identity-H encoding, enabling full Unicode support — including BMP (CJK, Cyrillic, Greek) and supplementary planes (CJK Extension B, enclosed alphanumerics, etc.). UTF-16 surrogate pairs are handled transparently.
+
+```csharp
+// Load from file, byte array, or stream
+var roboto = PdfFontSource.FromFile("Roboto-Regular.ttf");
+var mono = PdfFontSource.FromBytes(File.ReadAllBytes("SourceCodePro-Regular.otf"));
+var serif = PdfFontSource.FromStream(fontStream);
+
+// Use with any drawing method — Latin, CJK, Cyrillic, etc.
+page.DrawText("Custom font text", 50, 50, roboto, 14);
+page.DrawText("Кириллица", 50, 70, roboto, 14);      // Cyrillic
+
+var cjkFont = PdfFontSource.FromFile("NotoSansJP-Regular.ttf");
+page.DrawText("こんにちは世界", 50, 90, cjkFont, 14); // Japanese
+
+// Mix with built-in fonts in rich text
+page.DrawText(new[] {
+    new TextSpan("Hello ", PdfFont.HelveticaBold, 14),
+    new TextSpan("世界", cjkFont, 14, PdfColor.Red)
+}, 50, 120);
+
+// Use in tables
+table.HeaderFont = roboto;
+table.CellFont = roboto;
+```
+
+Built-in `PdfFont` values are automatically converted to `PdfFontSource`, so all existing code continues to work unchanged. The same `PdfFontSource` instance can be used across multiple pages — the font data is embedded only once in the PDF. Text rendered with custom fonts is selectable and copyable in PDF viewers (via an embedded ToUnicode CMap).
+
+### Character Support
+
+**Built-in fonts:**
+- WinAnsiEncoding coverage (~256 Latin characters, digits, punctuation)
+- Extended European diacritics (e.g. ą, ć, ę, ł, ň, ř, š, ž, ő, ű) via encoding extensions
+
+**Custom fonts (TrueType / OpenType):**
+- Full Unicode Basic Multilingual Plane (BMP) — U+0000 to U+FFFF
+- Supplementary Unicode planes — U+10000 to U+10FFFF (CJK Extension B, enclosed alphanumerics, etc.)
 - CJK characters (Chinese, Japanese, Korean)
-- Arabic, Hebrew, or other right-to-left scripts
-- Emoji
+- Cyrillic, Greek, Arabic characters, and other scripts
+- Any character the font contains a glyph for
 
-If your project requires custom fonts or broad Unicode support, consider a full-featured PDF library such as QuestPDF, iTextSharp, or PdfSharp.
+### What Is Not Supported
+
+- Right-to-left text layout (Arabic and Hebrew characters render, but layout is left-to-right)
+- Complex script shaping (ligatures, combining marks)
+- Font subsetting (the full font file is embedded)
+- WOFF/WOFF2 web font formats
 
 ## Version History
 
 | Version | Date | Changes |
 |---|---|---|
-| 0.53 | May 2026 | Add barcode and QR code support (Code 128, Code 39, EAN-13, UPC-A, QR Code) with vector rendering and configurable options.  Also did some code reorganization and optimization. |
+| 0.54 | May 21, 2026 | Add TrueType (.ttf) and OpenType (.otf) font embedding via `PdfFontSource.FromFile()` / `FromBytes()` / `FromStream()` with full Unicode support (BMP + supplementary planes) using CID composite fonts with Identity-H encoding. Supports CJK, Cyrillic, Greek, CJK Extension B, enclosed alphanumerics, and any character the font contains. UTF-16 surrogate pairs are handled transparently. Embedded ToUnicode CMap enables text selection/copy in PDF viewers. |
+| 0.53 | May 14, 2026 | Add barcode and QR code support (Code 128, Code 39, EAN-13, UPC-A, QR Code) with vector rendering and configurable options.  Also did some code reorganization and optimization.  Text methods are now consolidated into a single method with overloads... legacy methods are marked as obsolete. |
 | 0.52 | May 2026 | Add hierarchical lists with nesting, text wrapping, multi-page flow, and four list styles (Bullet, Numbered, RomanLower, RomanUpper) |
 | 0.51 | May 2026 | Add rotation support for text, images, and shapes |
 | 0.50 | April 2026 | Initial beta release |

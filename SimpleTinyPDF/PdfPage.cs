@@ -14,10 +14,10 @@ namespace SimpleTinyPDF
     public sealed class PdfPage
     {
         private readonly StringBuilder _content = new StringBuilder();
-        private readonly Dictionary<string, PdfFont> _usedFonts = new Dictionary<string, PdfFont>();
+        private readonly Dictionary<string, PdfFontSource> _usedFonts = new Dictionary<string, PdfFontSource>();
         private readonly Dictionary<string, PdfImage> _usedImages = new Dictionary<string, PdfImage>();
         private readonly Dictionary<float, string> _usedGraphicsStates = new Dictionary<float, string>();
-        private readonly Dictionary<PdfFont, EncodingExtension> _encodingExtensions = new Dictionary<PdfFont, EncodingExtension>();
+        private readonly Dictionary<PdfFontSource, EncodingExtension> _encodingExtensions = new Dictionary<PdfFontSource, EncodingExtension>();
         private int _nextFontId = 1;
         private int _nextImageId = 1;
         private int _nextGsId = 1;
@@ -42,15 +42,17 @@ namespace SimpleTinyPDF
             Height = height;
         }
 
-        internal Dictionary<string, PdfFont> GetUsedFonts() => _usedFonts;
+        internal Dictionary<string, PdfFontSource> GetUsedFonts() => _usedFonts;
         internal Dictionary<string, PdfImage> GetUsedImages() => _usedImages;
         internal Dictionary<float, string> GetUsedGraphicsStates() => _usedGraphicsStates;
         internal string GetContentStream() => _content.ToString();
         internal StringBuilder GetContentBuilder() => _content;
         internal IReadOnlyList<LinkAnnotation> GetLinkAnnotations() => _linkAnnotations;
 
-        internal EncodingExtension GetOrCreateEncodingExtension(PdfFont font)
+        internal EncodingExtension GetOrCreateEncodingExtension(PdfFontSource font)
         {
+            // Encoding extensions only apply to built-in Type1 fonts
+            if (!font.IsBuiltIn) return null;
             if (!_encodingExtensions.TryGetValue(font, out var ext))
             {
                 ext = new EncodingExtension();
@@ -59,13 +61,21 @@ namespace SimpleTinyPDF
             return ext;
         }
 
-        internal EncodingExtension GetEncodingExtension(PdfFont font)
+        internal EncodingExtension GetEncodingExtension(PdfFontSource font)
         {
             _encodingExtensions.TryGetValue(font, out var ext);
             return ext;
         }
 
-        private string EnsureFont(PdfFont font)
+        private string EncodeText(string text, PdfFontSource font)
+        {
+            if (font.IsBuiltIn)
+                return PdfStringHelper.Escape(text, GetOrCreateEncodingExtension(font));
+            font.CustomFont.RecordUsedCharacters(text);
+            return CidFontHelper.EncodeTextAsHexGlyphIds(text, font.CustomFont);
+        }
+
+        private string EnsureFont(PdfFontSource font)
         {
             foreach (var kv in _usedFonts)
             {
@@ -153,7 +163,7 @@ namespace SimpleTinyPDF
         }
 
         /// <summary>Measures the width of a string in points for the given font and size.</summary>
-        public float MeasureText(string text, PdfFont font, float fontSize) =>
+        public float MeasureText(string text, PdfFontSource font, float fontSize) =>
             FontMetrics.MeasureString(text, font, fontSize);
 
         private void AppendUnderline(float x, float pdfY, float width, float fontSize, PdfColor color)
@@ -171,12 +181,13 @@ namespace SimpleTinyPDF
         /// text wraps within that width. Returns the Y position after the rendered text.
         /// </summary>
         public float DrawText(string text, float x, float y,
-            PdfFont font = PdfFont.Helvetica, float fontSize = 12f,
+            PdfFontSource font = null, float fontSize = 12f,
             PdfColor? color = null, TextAlignment alignment = TextAlignment.Left,
             bool underline = false, float opacity = 1f,
             string link = null, float rotation = 0f,
             float? width = null, float lineSpacing = 1.2f)
         {
+            font = font ?? (PdfFontSource)PdfFont.Helvetica;
             if (string.IsNullOrEmpty(text)) return y;
 
             if (width.HasValue)
@@ -227,7 +238,7 @@ namespace SimpleTinyPDF
         /// <summary>Draws text wrapped within a box. Returns the Y position after the last line.</summary>
         [Obsolete("Use DrawText with the width parameter instead. Example: DrawText(text, x, y, width: 400)")]
         public float DrawTextBox(string text, float x, float y, float width,
-            PdfFont font = PdfFont.Helvetica, float fontSize = 12f,
+            PdfFontSource font = null, float fontSize = 12f,
             float lineSpacing = 1.2f, PdfColor? color = null,
             TextAlignment alignment = TextAlignment.Left, bool underline = false,
             float opacity = 1f, string link = null, float rotation = 0f)
@@ -254,7 +265,7 @@ namespace SimpleTinyPDF
         }
 
         private void DrawTextCore(string text, float x, float y,
-            PdfFont font, float fontSize,
+            PdfFontSource font, float fontSize,
             PdfColor? color, TextAlignment alignment,
             bool underline, float opacity,
             string link, float rotation)
@@ -277,7 +288,7 @@ namespace SimpleTinyPDF
             _content.AppendFormat("/{0} {1} Tf\n", fontId, F(fontSize));
             AppendColorFill(c);
             _content.AppendFormat("{0} {1} Td\n", F(drawX), F(pdfY));
-            _content.AppendFormat("{0} Tj\n", PdfStringHelper.Escape(text, GetOrCreateEncodingExtension(font)));
+            _content.AppendFormat("{0} Tj\n", EncodeText(text, font));
             _content.Append("ET\n");
             if (underline)
                 AppendUnderline(drawX, pdfY, MeasureText(text, font, fontSize), fontSize, c);
@@ -313,7 +324,7 @@ namespace SimpleTinyPDF
             _content.Append("BT\n");
             _content.AppendFormat("{0} {1} Td\n", F(drawX), F(pdfY));
 
-            PdfFont? lastFont = null;
+            PdfFontSource lastFont = null;
             float lastFontSize = -1;
             PdfColor? lastColor = null;
             float lastOpacity = -1f;
@@ -340,7 +351,7 @@ namespace SimpleTinyPDF
                     lastOpacity = span.Opacity;
                 }
 
-                if (lastFont == null || !lastFont.Value.Equals(span.Font) || lastFontSize != span.FontSize)
+                if (lastFont == null || !lastFont.Equals(span.Font) || lastFontSize != span.FontSize)
                 {
                     var fontId = EnsureFont(span.Font);
                     _content.AppendFormat("/{0} {1} Tf\n", fontId, F(span.FontSize));
@@ -355,7 +366,7 @@ namespace SimpleTinyPDF
                 }
 
                 float spanWidth = MeasureText(span.Text, span.Font, span.FontSize);
-                _content.AppendFormat("{0} Tj\n", PdfStringHelper.Escape(span.Text, GetOrCreateEncodingExtension(span.Font)));
+                _content.AppendFormat("{0} Tj\n", EncodeText(span.Text, span.Font));
                 if (span.Underline)
                     ulSpans?.Add((cursorX, spanWidth, span.FontSize, span.Color));
                 if (!string.IsNullOrEmpty(span.Link))
@@ -382,7 +393,7 @@ namespace SimpleTinyPDF
         }
 
         private float DrawTextBoxCore(string text, float x, float y, float width,
-            PdfFont font, float fontSize,
+            PdfFontSource font, float fontSize,
             float lineSpacing, PdfColor? color,
             TextAlignment alignment, bool underline,
             float opacity, string link, float rotation)
@@ -421,7 +432,7 @@ namespace SimpleTinyPDF
 
                 // Use Tm (text matrix) for absolute positioning instead of Td (relative)
                 _content.AppendFormat("1 0 0 1 {0} {1} Tm\n", F(drawX), F(pdfY));
-                _content.AppendFormat("{0} Tj\n", PdfStringHelper.Escape(line, GetOrCreateEncodingExtension(font)));
+                _content.AppendFormat("{0} Tj\n", EncodeText(line, font));
                 ulLines?.Add((drawX, pdfY, lineW));
                 if (!string.IsNullOrEmpty(link))
                     AddLinkAnnotation(link, drawX, pdfY, lineW, fontSize);
@@ -467,7 +478,7 @@ namespace SimpleTinyPDF
             AppendRotation(rotation, x, rotOriginY);
             _content.Append("BT\n");
 
-            PdfFont? lastFont = null;
+            PdfFontSource lastFont = null;
             float lastFontSize = -1;
             PdfColor? lastColor = null;
             float lastOpacity = -1f;
@@ -514,7 +525,7 @@ namespace SimpleTinyPDF
 
                     if (word.HasLeadingSpace)
                     {
-                        if (lastFont == null || !lastFont.Value.Equals(word.SpaceFont) ||
+                        if (lastFont == null || !lastFont.Equals(word.SpaceFont) ||
                             lastFontSize != word.SpaceFontSize)
                         {
                             var spaceFontId = EnsureFont(word.SpaceFont);
@@ -522,7 +533,7 @@ namespace SimpleTinyPDF
                             lastFont = word.SpaceFont;
                             lastFontSize = word.SpaceFontSize;
                         }
-                        _content.AppendFormat("{0} Tj\n", PdfStringHelper.Escape(" ", GetOrCreateEncodingExtension(word.SpaceFont)));
+                        _content.AppendFormat("{0} Tj\n", EncodeText(" ", word.SpaceFont));
                         if (word.SpaceUnderline)
                             ulSegments.Add((cursorX, pdfY, word.SpaceWidth, word.SpaceFontSize, word.Color));
 
@@ -549,7 +560,7 @@ namespace SimpleTinyPDF
                     if (string.IsNullOrEmpty(word.Text))
                         continue;
 
-                    if (lastFont == null || !lastFont.Value.Equals(word.Font) ||
+                    if (lastFont == null || !lastFont.Equals(word.Font) ||
                         lastFontSize != word.FontSize)
                     {
                         var fontId = EnsureFont(word.Font);
@@ -564,7 +575,7 @@ namespace SimpleTinyPDF
                         lastColor = word.Color;
                     }
 
-                    _content.AppendFormat("{0} Tj\n", PdfStringHelper.Escape(word.Text, GetOrCreateEncodingExtension(word.Font)));
+                    _content.AppendFormat("{0} Tj\n", EncodeText(word.Text, word.Font));
                     if (word.Underline)
                         ulSegments.Add((cursorX, pdfY, word.Width, word.FontSize, word.Color));
 
@@ -633,13 +644,14 @@ namespace SimpleTinyPDF
             float x, float y, float width,
             ListStyle style = ListStyle.Bullet,
             float bottomMargin = 0f,
-            PdfFont font = PdfFont.Helvetica, float fontSize = 12f,
+            PdfFontSource font = null, float fontSize = 12f,
             float lineSpacing = 1.2f, PdfColor? color = null,
             TextSpan bullet = null,
             int startNumber = 1,
             float indentPerLevel = 20f,
             float? continuationY = null)
         {
+            font = font ?? (PdfFontSource)PdfFont.Helvetica;
             if (items == null || items.Length == 0) return (this, y);
             var c = color ?? PdfColor.Black;
             var effectiveBullet = bullet ?? new TextSpan("\u2022", font, fontSize, c);
@@ -657,7 +669,7 @@ namespace SimpleTinyPDF
             float bottomMargin,
             int depth,
             int[] counters,
-            PdfFont font, float fontSize, float lineSpacing, PdfColor color,
+            PdfFontSource font, float fontSize, float lineSpacing, PdfColor color,
             ListStyle style, TextSpan bullet, float indentPerLevel)
         {
             bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;

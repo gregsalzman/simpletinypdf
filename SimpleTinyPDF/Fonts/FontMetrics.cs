@@ -5,6 +5,100 @@ namespace SimpleTinyPDF
     internal static class FontMetrics
     {
         /// <summary>
+        /// Returns the width of a character in 1/1000 em units (PdfFontSource overload).
+        /// </summary>
+        internal static int GetCharWidth(PdfFontSource font, char c)
+        {
+            if (font.IsBuiltIn)
+                return GetCharWidth(font.BuiltInFont, c);
+            return font.CustomFont.GetCharWidth(c);
+        }
+
+        /// <summary>
+        /// Measures the width of a string in points (PdfFontSource overload).
+        /// </summary>
+        internal static float MeasureString(string text, PdfFontSource font, float fontSize)
+        {
+            if (font.IsBuiltIn)
+                return MeasureString(text, font.BuiltInFont, fontSize);
+            if (string.IsNullOrEmpty(text)) return 0;
+            int total = 0;
+            for (int i = 0; i < text.Length; i++)
+            {
+                int cp;
+                if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+                {
+                    cp = char.ConvertToUtf32(text[i], text[i + 1]);
+                    i++;
+                }
+                else
+                {
+                    cp = text[i];
+                }
+                total += font.CustomFont.GetCharWidth(cp);
+            }
+            return total * fontSize / 1000f;
+        }
+
+        /// <summary>
+        /// Word-wraps text to fit within the specified width (PdfFontSource overload).
+        /// </summary>
+        internal static List<string> WrapText(string text, PdfFontSource font, float fontSize, float maxWidth)
+        {
+            if (font.IsBuiltIn)
+                return WrapText(text, font.BuiltInFont, fontSize, maxWidth);
+
+            var result = new List<string>();
+            if (string.IsNullOrEmpty(text))
+            {
+                result.Add("");
+                return result;
+            }
+
+            var paragraphs = text.Split('\n');
+            foreach (var para in paragraphs)
+            {
+                if (string.IsNullOrEmpty(para))
+                {
+                    result.Add("");
+                    continue;
+                }
+
+                var words = para.Split(' ');
+                var currentLine = new System.Text.StringBuilder();
+                float currentWidth = 0;
+                float spaceWidth = MeasureString(" ", font, fontSize);
+
+                foreach (var word in words)
+                {
+                    float wordWidth = MeasureString(word, font, fontSize);
+
+                    if (currentLine.Length == 0)
+                    {
+                        currentLine.Append(word);
+                        currentWidth = wordWidth;
+                    }
+                    else if (currentWidth + spaceWidth + wordWidth <= maxWidth)
+                    {
+                        currentLine.Append(' ').Append(word);
+                        currentWidth += spaceWidth + wordWidth;
+                    }
+                    else
+                    {
+                        result.Add(currentLine.ToString());
+                        currentLine.Clear();
+                        currentLine.Append(word);
+                        currentWidth = wordWidth;
+                    }
+                }
+
+                result.Add(currentLine.ToString());
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Returns the width of a character in 1/1000 em units.
         /// </summary>
         internal static int GetCharWidth(PdfFont font, char c)
@@ -132,13 +226,13 @@ namespace SimpleTinyPDF
         internal class StyledWord
         {
             internal string Text;
-            internal PdfFont Font;
+            internal PdfFontSource Font;
             internal float FontSize;
             internal PdfColor Color;
             internal float Width;
             internal bool StartsNewLine;
             internal bool HasLeadingSpace;
-            internal PdfFont SpaceFont;
+            internal PdfFontSource SpaceFont;
             internal float SpaceFontSize;
             internal float SpaceWidth;
             internal bool Underline;
@@ -164,7 +258,7 @@ namespace SimpleTinyPDF
             // Phase 1: Tokenize all spans into a flat list of StyledWords.
             var allWords = new List<StyledWord>();
             bool pendingSpace = false;
-            PdfFont pendingSpaceFont = PdfFont.Helvetica;
+            PdfFontSource pendingSpaceFont = PdfFont.Helvetica;
             float pendingSpaceFontSize = 12f;
             bool pendingSpaceUnderline = false;
             string pendingSpaceLink = null;
@@ -244,7 +338,7 @@ namespace SimpleTinyPDF
 
                         // Determine leading space
                         bool hasSpace = false;
-                        PdfFont spaceFont = span.Font;
+                        PdfFontSource spaceFont = span.Font;
                         float spaceFontSize = span.FontSize;
                         bool spaceUnderline = span.Underline;
                         string spaceLink = span.Link;

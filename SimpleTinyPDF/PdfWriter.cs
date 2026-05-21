@@ -238,6 +238,7 @@ namespace SimpleTinyPDF
 
             // 5. ExtGState objects (deduplicated across pages by opacity value)
             var gsObjects = new Dictionary<float, PdfDict>();
+            var customFontObjects = new Dictionary<TrueTypeFont, (PdfStream stream, PdfDict descriptor, PdfDict type0Font)>();
 
             // 6. Pages
             var pageObjRefs = new List<string>();
@@ -250,20 +251,97 @@ namespace SimpleTinyPDF
                 var fontRefParts = new List<string>();
                 foreach (var kv in usedFonts)
                 {
-                    var fontObj = new PdfDict();
-                    fontObj.Set("Type", "/Font");
-                    fontObj.Set("Subtype", "/Type1");
-                    fontObj.Set("BaseFont", "/" + PdfFontNames.GetPdfName(kv.Value));
-                    if (kv.Value != PdfFont.Symbol && kv.Value != PdfFont.ZapfDingbats)
+                    var fontSource = kv.Value;
+
+                    if (fontSource.IsBuiltIn)
                     {
-                        var ext = page.GetEncodingExtension(kv.Value);
-                        if (ext != null && ext.HasExtensions)
-                            fontObj.Set("Encoding", ext.GetEncodingDict());
-                        else
-                            fontObj.Set("Encoding", "/WinAnsiEncoding");
+                        var builtIn = fontSource.BuiltInFont;
+                        var fontObj = new PdfDict();
+                        fontObj.Set("Type", "/Font");
+                        fontObj.Set("Subtype", "/Type1");
+                        fontObj.Set("BaseFont", "/" + PdfFontNames.GetPdfName(builtIn));
+                        if (builtIn != PdfFont.Symbol && builtIn != PdfFont.ZapfDingbats)
+                        {
+                            var ext = page.GetEncodingExtension(fontSource);
+                            if (ext != null && ext.HasExtensions)
+                                fontObj.Set("Encoding", ext.GetEncodingDict());
+                            else
+                                fontObj.Set("Encoding", "/WinAnsiEncoding");
+                        }
+                        AddObj(fontObj);
+                        fontRefParts.Add($"/{kv.Key} {fontObj.Ref}");
                     }
-                    AddObj(fontObj);
-                    fontRefParts.Add($"/{kv.Key} {fontObj.Ref}");
+                    else
+                    {
+                        var ttf = fontSource.CustomFont;
+
+                        // Deduplicate: reuse entire Type0 font object tree if already embedded
+                        if (!customFontObjects.TryGetValue(ttf, out var cached))
+                        {
+                            // Font file stream (full TTF/OTF binary)
+                            var fontStream = new PdfStream();
+                            fontStream.Data = ttf.RawData;
+                            if (ttf.IsCff)
+                                fontStream.Set("Subtype", "/OpenType");
+                            else
+                                fontStream.Set("Length1", ttf.RawData.Length.ToString());
+                            AddObj(fontStream);
+
+                            // FontDescriptor
+                            var descriptor = new PdfDict();
+                            descriptor.Set("Type", "/FontDescriptor");
+                            descriptor.Set("FontName", "/" + ttf.PostScriptName);
+                            descriptor.Set("Flags", ttf.Flags.ToString());
+                            descriptor.Set("FontBBox",
+                                $"[{ttf.FontBBox[0]} {ttf.FontBBox[1]} {ttf.FontBBox[2]} {ttf.FontBBox[3]}]");
+                            descriptor.Set("ItalicAngle", PdfStringHelper.F(ttf.ItalicAngle));
+                            descriptor.Set("Ascent",
+                                ((int)(ttf.Ascender * 1000L / ttf.UnitsPerEm)).ToString());
+                            descriptor.Set("Descent",
+                                ((int)(ttf.Descender * 1000L / ttf.UnitsPerEm)).ToString());
+                            descriptor.Set("CapHeight",
+                                ((int)(ttf.CapHeight * 1000L / ttf.UnitsPerEm)).ToString());
+                            descriptor.Set("StemV", ttf.StemV.ToString());
+                            descriptor.Set(ttf.IsCff ? "FontFile3" : "FontFile2", fontStream.Ref);
+                            AddObj(descriptor);
+
+                            // ToUnicode CMap stream
+                            var glyphToUnicode = ttf.GetUsedGlyphToUnicodeMap();
+                            var toUnicodeCMap = new PdfStream();
+                            toUnicodeCMap.Data = CidFontHelper.BuildToUnicodeCMap(glyphToUnicode);
+                            AddObj(toUnicodeCMap);
+
+                            // CIDFont dictionary
+                            var cidFont = new PdfDict();
+                            cidFont.Set("Type", "/Font");
+                            cidFont.Set("Subtype", ttf.IsCff ? "/CIDFontType0" : "/CIDFontType2");
+                            cidFont.Set("BaseFont", "/" + ttf.PostScriptName);
+                            cidFont.Set("CIDSystemInfo",
+                                "<< /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>");
+                            cidFont.Set("FontDescriptor", descriptor.Ref);
+                            cidFont.Set("DW", "0");
+                            var usedGlyphIds = ttf.GetUsedGlyphIds();
+                            cidFont.Set("W", CidFontHelper.BuildWidthArray(ttf, usedGlyphIds));
+                            if (!ttf.IsCff)
+                                cidFont.Set("CIDToGIDMap", "/Identity");
+                            AddObj(cidFont);
+
+                            // Type0 (top-level) font dictionary
+                            var type0Font = new PdfDict();
+                            type0Font.Set("Type", "/Font");
+                            type0Font.Set("Subtype", "/Type0");
+                            type0Font.Set("BaseFont", "/" + ttf.PostScriptName);
+                            type0Font.Set("Encoding", "/Identity-H");
+                            type0Font.Set("DescendantFonts", "[" + cidFont.Ref + "]");
+                            type0Font.Set("ToUnicode", toUnicodeCMap.Ref);
+                            AddObj(type0Font);
+
+                            cached = (fontStream, descriptor, type0Font);
+                            customFontObjects[ttf] = cached;
+                        }
+
+                        fontRefParts.Add($"/{kv.Key} {cached.type0Font.Ref}");
+                    }
                 }
 
                 // Graphics state objects for this page
