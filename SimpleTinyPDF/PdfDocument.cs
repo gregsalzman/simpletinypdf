@@ -19,6 +19,12 @@ namespace SimpleTinyPDF
         /// <summary>Document author (appears in PDF metadata).</summary>
         public string Author { get; set; }
 
+        /// <summary>
+        /// Optional encryption settings. When set, the saved PDF will be encrypted
+        /// with the specified algorithm and passwords.
+        /// </summary>
+        public PdfEncryptionOptions Encryption { get; set; }
+
         /// <summary>The list of pages in this document.</summary>
         public IReadOnlyList<PdfPage> Pages => _pages;
 

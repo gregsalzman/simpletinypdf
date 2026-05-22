@@ -15,6 +15,7 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 - **Rotation** — rotate any text, image, or shape element by an arbitrary angle
 - **Bookmarks** — hierarchical outline / table of contents
 - **Annotations** — text (sticky notes), markup (highlight, underline, strikeout), stamps (Approved, Draft, Confidential, etc.), and internal links (navigate to another page)
+- **Encryption** — AES-128 and AES-256 password protection with configurable user/owner passwords and granular permission flags (print, copy, modify, annotate, etc.)
 - **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) plus TrueType (.ttf) and OpenType (.otf) font embedding with full Unicode support including supplementary planes (CJK, Cyrillic, Greek, Arabic, CJK Extension B, enclosed alphanumerics, etc.)
 - **Colors** — RGB, CMYK, and grayscale
 - **Page sizes** — A3, A4, A5, Letter, Legal, custom dimensions, landscape
@@ -37,7 +38,7 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 - Right-to-left text layout (Arabic, Hebrew) or complex script shaping
 - Form fields (AcroForms)
 - PDF reading, parsing, or editing
-- Encryption or digital signatures
+- Digital signatures
 - Automatic page layout (headers/footers, page numbers, flowing columns)
 
 ## Size Comparison
@@ -46,11 +47,11 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~106 KB** | **~106 KB** | **1x** | No |
-| **PDFsharp** 6.2.4 | ~4.4 MB | ~4.5 MB | 45x | No |
-| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 149x | No (BouncyCastle ~8 MB) |
-| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 356x | Yes (bundled Skia) |
-| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 2,475x | Yes (bundled Chromium) |
+| **SimpleTinyPDF** | **~115 KB** | **~115 KB** | **1x** | No |
+| **PDFsharp** 6.2.4 | ~4.4 MB | ~4.5 MB | 39x | No |
+| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 130x | No (BouncyCastle ~8 MB) |
+| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 313x | Yes (bundled Skia) |
+| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 2,174x | Yes (bundled Chromium) |
 
 IronPDF's footprint includes the Chromium rendering engine downloaded at build/runtime. QuestPDF bundles custom Skia native binaries for cross-platform rendering.
 
@@ -525,6 +526,59 @@ page1.AddLinkToPage(50, 80, 120, 20, page2, targetY: 200);
 | `targetPage` | required | The page to navigate to |
 | `targetY` | null | Y position on the target page (fits entire page if null) |
 
+### Encryption
+
+Protect PDF documents with password-based encryption. Supports AES-128 (PDF 1.6) and AES-256 (PDF 2.0) with user passwords, owner passwords, and granular permission flags. All cryptography uses built-in `System.Security.Cryptography` — no external dependencies.
+
+```csharp
+// Owner password only — opens without a password, but restricts actions
+doc.Encryption = new PdfEncryptionOptions
+{
+    OwnerPassword = "admin-secret",
+    Permissions = PdfPermissions.Print | PdfPermissions.ExtractText
+};
+
+// User + owner password — requires password to open
+doc.Encryption = new PdfEncryptionOptions
+{
+    UserPassword = "open-me",
+    OwnerPassword = "full-access",
+    Level = PdfEncryptionLevel.Aes256,
+    Permissions = PdfPermissions.Print
+};
+
+// All permissions, AES-128 (default level)
+doc.Encryption = new PdfEncryptionOptions
+{
+    UserPassword = "secret",
+    OwnerPassword = "owner"
+};
+```
+
+**PdfEncryptionOptions:**
+
+| Property | Default | Description |
+|---|---|---|
+| `UserPassword` | `""` | Password to open the document. Empty means no open password required |
+| `OwnerPassword` | `""` | Password for full owner access (change permissions, unrestricted operations) |
+| `Level` | `Aes128` | `Aes128` (PDF 1.6, V4/R4) or `Aes256` (PDF 2.0, V5/R6) |
+| `Permissions` | `All` | User access permissions (see below) |
+
+**PdfPermissions** (combine with `|`):
+
+| Flag | Description |
+|---|---|
+| `Print` | Print the document (may be low-quality without `HighQualityPrint`) |
+| `ModifyContents` | Modify document contents |
+| `ExtractText` | Copy or extract text and graphics |
+| `AnnotateAndForms` | Add or modify annotations and fill form fields |
+| `FillForms` | Fill in existing form fields |
+| `ExtractForAccessibility` | Extract text and graphics for accessibility |
+| `Assemble` | Insert, rotate, delete pages, and bookmarks |
+| `HighQualityPrint` | Print at high quality |
+| `All` | All permissions granted |
+| `None` | No permissions granted |
+
 ### Barcodes
 
 Draw 1D barcodes and QR codes as crisp vector graphics (PDF rectangles, not images). All encoding, check digits, and error correction are computed internally with zero dependencies.
@@ -783,6 +837,7 @@ Built-in `PdfFont` values are automatically converted to `PdfFontSource`, so all
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.56 | May 22, 2026 | Add AES-128 and AES-256 PDF encryption with user/owner passwords and permission flags. Pure C# implementation using built-in System.Security.Cryptography. |
 | 0.55 | May 22, 2026 | Add annotations: text (sticky notes), markup (highlight, underline, strikeout), stamps (14 predefined types), and internal links (GoTo page navigation). |
 | 0.54 | May 21, 2026 | Add TrueType (.ttf) and OpenType (.otf) font embedding via `PdfFontSource.FromFile()` / `FromBytes()` / `FromStream()` with full Unicode support (BMP + supplementary planes) using CID composite fonts with Identity-H encoding. Supports CJK, Cyrillic, Greek, CJK Extension B, enclosed alphanumerics, and any character the font contains. UTF-16 surrogate pairs are handled transparently. Embedded ToUnicode CMap enables text selection/copy in PDF viewers. |
 | 0.53 | May 14, 2026 | Add barcode and QR code support (Code 128, Code 39, EAN-13, UPC-A, QR Code) with vector rendering and configurable options.  Also did some code reorganization and optimization.  Text methods are now consolidated into a single method with overloads... legacy methods are marked as obsolete. |

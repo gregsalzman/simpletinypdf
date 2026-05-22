@@ -577,11 +577,40 @@ namespace SimpleTinyPDF
                 catalog.Set("Outlines", outlineRoot.Ref);
             }
 
+            // Generate file ID early (needed for encryption key derivation)
+            byte[] idHash;
+            using (var md5 = MD5.Create())
+            {
+                var idSource = Encoding.ASCII.GetBytes(
+                    DateTime.Now.ToString("o") + objects.Count);
+                idHash = md5.ComputeHash(idSource);
+            }
+            var idHex = BitConverter.ToString(idHash).Replace("-", "");
+
+            // Set up encryption if configured
+            PdfDict encryptDict = null;
+            if (doc.Encryption != null)
+            {
+                var encryptor = new PdfEncryptor(doc.Encryption, idHash);
+                encryptDict = encryptor.BuildEncryptionDict();
+                AddObj(encryptDict);
+
+                // Encrypt all objects (except the encryption dict itself)
+                foreach (var obj in objects)
+                {
+                    if (obj == encryptDict) continue;
+                    EncryptObject(obj, encryptor);
+                }
+            }
+
             // Write PDF to stream
             var w = new PdfBinaryWriter(output);
 
-            // Header
-            w.WriteAscii("%PDF-1.4\n");
+            // Header — version depends on encryption level
+            string pdfVersion = "1.4";
+            if (doc.Encryption != null)
+                pdfVersion = doc.Encryption.Level == PdfEncryptionLevel.Aes256 ? "2.0" : "1.6";
+            w.WriteAscii($"%PDF-{pdfVersion}\n");
             w.WriteBytes(new byte[] { 0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A }); // binary comment
 
             // Body
@@ -603,17 +632,12 @@ namespace SimpleTinyPDF
                 w.WriteAscii($"{offsets[i]:D10} 00000 n \n");
 
             // Trailer
-            // Generate a file ID based on creation time and content size to satisfy PDF spec
-            byte[] idHash;
-            using (var md5 = MD5.Create())
-            {
-                var idSource = Encoding.ASCII.GetBytes(
-                    DateTime.Now.ToString("o") + objects.Count + xrefPos);
-                idHash = md5.ComputeHash(idSource);
-            }
-            var idHex = BitConverter.ToString(idHash).Replace("-", "");
+            var trailer = $"<< /Size {objects.Count + 1} /Root {catalog.Ref} /Info {info.Ref} /ID [<{idHex}> <{idHex}>]";
+            if (encryptDict != null)
+                trailer += $" /Encrypt {encryptDict.Ref}";
+            trailer += " >>\n";
             w.WriteAscii("trailer\n");
-            w.WriteAscii($"<< /Size {objects.Count + 1} /Root {catalog.Ref} /Info {info.Ref} /ID [<{idHex}> <{idHex}>] >>\n");
+            w.WriteAscii(trailer);
             w.WriteAscii("startxref\n");
             w.WriteAscii($"{xrefPos}\n");
             w.WriteAscii("%%EOF\n");
@@ -683,6 +707,81 @@ namespace SimpleTinyPDF
                 return $"[{PdfStringHelper.F(r)} {PdfStringHelper.F(g)} {PdfStringHelper.F(b)}]";
             }
             return $"[{PdfStringHelper.F(color.R)} {PdfStringHelper.F(color.G)} {PdfStringHelper.F(color.B)}]";
+        }
+
+        private static void EncryptObject(PdfObj obj, PdfEncryptor encryptor)
+        {
+            if (obj is PdfStream stream)
+                stream.Data = encryptor.EncryptStream(stream.Data, obj.ObjectNumber, 0);
+
+            if (obj is PdfDict dict)
+            {
+                for (int i = 0; i < dict.Entries.Count; i++)
+                {
+                    var entry = dict.Entries[i];
+                    if (entry.Value != null && entry.Value.Length >= 2
+                        && entry.Value[0] == '(' && entry.Value[entry.Value.Length - 1] == ')')
+                    {
+                        var raw = DecodePdfLiteralString(entry.Value);
+                        var encrypted = encryptor.EncryptString(raw, obj.ObjectNumber, 0);
+                        dict.Entries[i] = new KeyValuePair<string, string>(
+                            entry.Key, "<" + PdfEncryptor.BytesToHex(encrypted) + ">");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reverses PdfStringHelper.Escape: converts a PDF literal string like "(Hello\\nWorld)"
+        /// back into raw bytes by parsing escape sequences.
+        /// </summary>
+        private static byte[] DecodePdfLiteralString(string pdfString)
+        {
+            // Strip surrounding parentheses
+            var inner = pdfString.Substring(1, pdfString.Length - 2);
+            var bytes = new System.Collections.Generic.List<byte>(inner.Length);
+            int pos = 0;
+            while (pos < inner.Length)
+            {
+                if (inner[pos] == '\\' && pos + 1 < inner.Length)
+                {
+                    pos++;
+                    char next = inner[pos];
+                    if (next == '\\') { bytes.Add((byte)'\\'); pos++; }
+                    else if (next == '(') { bytes.Add((byte)'('); pos++; }
+                    else if (next == ')') { bytes.Add((byte)')'); pos++; }
+                    else if (next == 'n') { bytes.Add((byte)'\n'); pos++; }
+                    else if (next == 'r') { bytes.Add((byte)'\r'); pos++; }
+                    else if (next == 't') { bytes.Add((byte)'\t'); pos++; }
+                    else if (next >= '0' && next <= '7')
+                    {
+                        // Octal escape: up to 3 digits
+                        int octal = next - '0';
+                        int digits = 1;
+                        while (digits < 3 && pos + 1 < inner.Length
+                               && inner[pos + 1] >= '0' && inner[pos + 1] <= '7')
+                        {
+                            pos++;
+                            octal = octal * 8 + (inner[pos] - '0');
+                            digits++;
+                        }
+                        bytes.Add((byte)(octal & 0xFF));
+                        pos++;
+                    }
+                    else
+                    {
+                        // Unknown escape — just take the character
+                        bytes.Add((byte)next);
+                        pos++;
+                    }
+                }
+                else
+                {
+                    bytes.Add((byte)inner[pos]);
+                    pos++;
+                }
+            }
+            return bytes.ToArray();
         }
     }
 }
