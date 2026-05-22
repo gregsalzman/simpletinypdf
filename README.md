@@ -1,8 +1,8 @@
 # SimpleTinyPDF
 
-An extremely small, zero-dependency PDF generation library for .NET.
+A small-but-mighty zero-dependency PDF generation library for .NET.
 
-SimpleTinyPDF lets you create PDF documents from C# with no external packages. It targets .NET Standard 2.0, so it works with .NET Framework 4.6.1+, .NET Core 2.0+, and .NET 5+. You add pages, draw text, images, shapes, and tables, etc then save. There is no DOM, no layout engine, and no markup language — you position everything in points.
+SimpleTinyPDF lets you create PDF documents from C# with no external packages. It targets .NET Standard 2.0, so it works with .NET Framework 4.6.1+, .NET Core 2.0+, and .NET 5+. 
 
 ## Features
 
@@ -14,6 +14,7 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 - **Shapes** — lines, rectangles (stroke and/or fill)
 - **Rotation** — rotate any text, image, or shape element by an arbitrary angle
 - **Bookmarks** — hierarchical outline / table of contents
+- **Annotations** — text (sticky notes), markup (highlight, underline, strikeout), stamps (Approved, Draft, Confidential, etc.), and internal links (navigate to another page)
 - **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) plus TrueType (.ttf) and OpenType (.otf) font embedding with full Unicode support including supplementary planes (CJK, Cyrillic, Greek, Arabic, CJK Extension B, enclosed alphanumerics, etc.)
 - **Colors** — RGB, CMYK, and grayscale
 - **Page sizes** — A3, A4, A5, Letter, Legal, custom dimensions, landscape
@@ -34,7 +35,7 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 
 - HTML-to-PDF conversion
 - Right-to-left text layout (Arabic, Hebrew) or complex script shaping
-- Form fields or annotations
+- Form fields (AcroForms)
 - PDF reading, parsing, or editing
 - Encryption or digital signatures
 - Automatic page layout (headers/footers, page numbers, flowing columns)
@@ -45,7 +46,7 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~101 KB** | **~101 KB** | **1x** | No |
+| **SimpleTinyPDF** | **~106 KB** | **~106 KB** | **1x** | No |
 | **PDFsharp** 6.2.4 | ~4.4 MB | ~4.5 MB | 45x | No |
 | **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 149x | No (BouncyCastle ~8 MB) |
 | **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 356x | Yes (bundled Skia) |
@@ -434,6 +435,96 @@ advanced.AddBookmark("Performance Tuning", page3, y: 200);
 
 When `y` is omitted the bookmark fits the entire page. When `y` is provided the viewer scrolls to that vertical position (in the page's coordinate system).
 
+### Annotations
+
+Add interactive annotations to pages — sticky notes, text markup, stamps, and internal document links. All annotation types support both TopDown and BottomUp coordinate systems.
+
+**Text Annotations (Sticky Notes)**
+
+```csharp
+// Basic sticky note
+page.AddTextAnnotation(100, 100, "Please review this section.");
+
+// With title, icon, color, and open state
+page.AddTextAnnotation(100, 200, "Needs revision", title: "Reviewer",
+    icon: TextAnnotationIcon.Note, color: PdfColor.Red, open: true);
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `x`, `y` | required | Position of the annotation icon (24x24 points) |
+| `contents` | required | Note text shown in the popup |
+| `title` | null | Author or title shown in the popup header |
+| `icon` | `Comment` | Icon style: `Comment`, `Note`, `Key`, `Help`, `NewParagraph`, `Paragraph`, `Insert` |
+| `color` | null | Icon color (viewer default if null) |
+| `open` | false | Whether the popup starts open |
+
+**Markup Annotations (Highlight, Underline, StrikeOut)**
+
+```csharp
+// Highlight a region
+page.AddMarkupAnnotation(50, 50, 200, 14, MarkupAnnotationType.Highlight,
+    color: PdfColor.Rgb(1f, 1f, 0f));
+
+// Underline with a comment
+page.AddMarkupAnnotation(50, 80, 200, 14, MarkupAnnotationType.Underline,
+    color: PdfColor.Green, contents: "Good point");
+
+// Strikeout
+page.AddMarkupAnnotation(50, 110, 200, 14, MarkupAnnotationType.StrikeOut,
+    color: PdfColor.Red);
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `x`, `y` | required | Top-left corner of the marked region |
+| `width`, `height` | required | Size of the marked region |
+| `type` | `Highlight` | `Highlight`, `Underline`, or `StrikeOut` |
+| `color` | null | Markup color (viewer default if null) |
+| `contents` | null | Comment text shown in a popup |
+| `title` | null | Author name |
+
+**Stamp Annotations**
+
+```csharp
+page.AddStampAnnotation(100, 100, 200, 60, stamp: StampType.Approved);
+page.AddStampAnnotation(100, 200, 200, 60, stamp: StampType.Confidential,
+    contents: "Internal use only");
+```
+
+Available stamp types: `Approved`, `Experimental`, `NotApproved`, `AsIs`, `Expired`, `NotForPublicRelease`, `Confidential`, `Final`, `Sold`, `Departmental`, `ForComment`, `TopSecret`, `Draft`, `ForPublicRelease`
+
+| Parameter | Default | Description |
+|---|---|---|
+| `x`, `y` | required | Top-left corner of the stamp |
+| `width`, `height` | required | Size of the stamp |
+| `stamp` | `Draft` | Predefined stamp type |
+| `contents` | null | Tooltip text |
+| `title` | null | Author name |
+| `color` | null | Stamp color |
+
+**Internal Links (GoTo)**
+
+Create clickable regions that navigate to another page in the same document.
+
+```csharp
+var page1 = doc.AddPage();
+var page2 = doc.AddPage();
+
+// Link that fits the target page
+page1.AddLinkToPage(50, 50, 120, 20, page2);
+
+// Link that scrolls to a specific Y position
+page1.AddLinkToPage(50, 80, 120, 20, page2, targetY: 200);
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `x`, `y` | required | Top-left corner of the clickable area |
+| `width`, `height` | required | Size of the clickable area |
+| `targetPage` | required | The page to navigate to |
+| `targetY` | null | Y position on the target page (fits entire page if null) |
+
 ### Barcodes
 
 Draw 1D barcodes and QR codes as crisp vector graphics (PDF rectangles, not images). All encoding, check digits, and error correction are computed internally with zero dependencies.
@@ -692,6 +783,7 @@ Built-in `PdfFont` values are automatically converted to `PdfFontSource`, so all
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.55 | May 22, 2026 | Add annotations: text (sticky notes), markup (highlight, underline, strikeout), stamps (14 predefined types), and internal links (GoTo page navigation). |
 | 0.54 | May 21, 2026 | Add TrueType (.ttf) and OpenType (.otf) font embedding via `PdfFontSource.FromFile()` / `FromBytes()` / `FromStream()` with full Unicode support (BMP + supplementary planes) using CID composite fonts with Identity-H encoding. Supports CJK, Cyrillic, Greek, CJK Extension B, enclosed alphanumerics, and any character the font contains. UTF-16 surrogate pairs are handled transparently. Embedded ToUnicode CMap enables text selection/copy in PDF viewers. |
 | 0.53 | May 14, 2026 | Add barcode and QR code support (Code 128, Code 39, EAN-13, UPC-A, QR Code) with vector rendering and configurable options.  Also did some code reorganization and optimization.  Text methods are now consolidated into a single method with overloads... legacy methods are marked as obsolete. |
 | 0.52 | May 2026 | Add hierarchical lists with nesting, text wrapping, multi-page flow, and four list styles (Bullet, Numbered, RomanLower, RomanUpper) |

@@ -399,36 +399,106 @@ namespace SimpleTinyPDF
                 }
                 resources.Append(">>");
 
-                // Link annotations
-                var annotations = page.GetLinkAnnotations();
-                var annotRefs = new List<string>();
-                if (annotations.Count > 0)
-                {
-                    foreach (var annot in annotations)
-                    {
-                        var annotDict = new PdfDict();
-                        annotDict.Set("Type", "/Annot");
-                        annotDict.Set("Subtype", "/Link");
-                        annotDict.Set("Rect", $"[{PdfStringHelper.F(annot.X0)} {PdfStringHelper.F(annot.Y0)} {PdfStringHelper.F(annot.X1)} {PdfStringHelper.F(annot.Y1)}]");
-                        annotDict.Set("Border", "[0 0 0]");
-                        annotDict.Set("A", $"<< /S /URI /URI ({EscapeUri(annot.Url)}) >>");
-                        AddObj(annotDict);
-                        annotRefs.Add(annotDict.Ref);
-                    }
-                }
-
-                // Page dictionary
+                // Page dictionary (created before annotations so all page refs are available)
                 var pageDict = new PdfDict();
                 pageDict.Set("Type", "/Page");
                 pageDict.Set("Parent", pagesNode.Ref);
                 pageDict.Set("MediaBox", $"[0 0 {PdfStringHelper.F(page.Width)} {PdfStringHelper.F(page.Height)}]");
                 pageDict.Set("Contents", contentStream.Ref);
                 pageDict.Set("Resources", resources.ToString());
-                if (annotRefs.Count > 0)
-                    pageDict.Set("Annots", "[" + string.Join(" ", annotRefs) + "]");
                 AddObj(pageDict);
                 pageObjRefs.Add(pageDict.Ref);
                 pageDicts[page] = pageDict;
+            }
+
+            // Second pass: annotations (after all page dicts exist for internal links)
+            foreach (var page in doc.Pages)
+            {
+                var annotations = page.GetAnnotations();
+                if (annotations.Count > 0)
+                {
+                    var annotRefs = new List<string>();
+                    foreach (var annot in annotations)
+                    {
+                        var annotDict = new PdfDict();
+                        annotDict.Set("Type", "/Annot");
+                        var rect = $"[{PdfStringHelper.F(annot.X0)} {PdfStringHelper.F(annot.Y0)} {PdfStringHelper.F(annot.X1)} {PdfStringHelper.F(annot.Y1)}]";
+                        annotDict.Set("Rect", rect);
+
+                        switch (annot.Kind)
+                        {
+                            case AnnotationKind.Link:
+                                annotDict.Set("Subtype", "/Link");
+                                annotDict.Set("Border", "[0 0 0]");
+                                annotDict.Set("A", $"<< /S /URI /URI ({EscapeUri(annot.Url)}) >>");
+                                break;
+
+                            case AnnotationKind.Text:
+                                annotDict.Set("Subtype", "/Text");
+                                annotDict.Set("Contents", PdfStringHelper.Escape(annot.Contents));
+                                if (annot.Title != null)
+                                    annotDict.Set("T", PdfStringHelper.Escape(annot.Title));
+                                annotDict.Set("Name", "/" + GetTextAnnotationIconName(annot.Icon));
+                                if (annot.Color.HasValue)
+                                    annotDict.Set("C", FormatColorArray(annot.Color.Value));
+                                annotDict.Set("Open", annot.Open ? "true" : "false");
+                                annotDict.Set("F", "4");
+                                break;
+
+                            case AnnotationKind.Markup:
+                                annotDict.Set("Subtype", "/" + GetMarkupSubtype(annot.MarkupType));
+                                if (annot.QuadPoints != null)
+                                {
+                                    var qp = annot.QuadPoints;
+                                    annotDict.Set("QuadPoints",
+                                        $"[{PdfStringHelper.F(qp[0])} {PdfStringHelper.F(qp[1])} {PdfStringHelper.F(qp[2])} {PdfStringHelper.F(qp[3])} " +
+                                        $"{PdfStringHelper.F(qp[4])} {PdfStringHelper.F(qp[5])} {PdfStringHelper.F(qp[6])} {PdfStringHelper.F(qp[7])}]");
+                                }
+                                if (annot.Color.HasValue)
+                                    annotDict.Set("C", FormatColorArray(annot.Color.Value));
+                                if (annot.Contents != null)
+                                    annotDict.Set("Contents", PdfStringHelper.Escape(annot.Contents));
+                                if (annot.Title != null)
+                                    annotDict.Set("T", PdfStringHelper.Escape(annot.Title));
+                                break;
+
+                            case AnnotationKind.Stamp:
+                                annotDict.Set("Subtype", "/Stamp");
+                                annotDict.Set("Name", "/" + GetStampName(annot.Stamp));
+                                if (annot.Contents != null)
+                                    annotDict.Set("Contents", PdfStringHelper.Escape(annot.Contents));
+                                if (annot.Title != null)
+                                    annotDict.Set("T", PdfStringHelper.Escape(annot.Title));
+                                if (annot.Color.HasValue)
+                                    annotDict.Set("C", FormatColorArray(annot.Color.Value));
+                                break;
+
+                            case AnnotationKind.InternalLink:
+                                annotDict.Set("Subtype", "/Link");
+                                annotDict.Set("Border", "[0 0 0]");
+                                if (annot.TargetPage != null && pageDicts.TryGetValue(annot.TargetPage, out var targetPageDict))
+                                {
+                                    if (annot.TargetY.HasValue)
+                                    {
+                                        float pdfTargetY = annot.TargetPage.CoordinateOrigin == CoordinateOrigin.TopDown
+                                            ? annot.TargetPage.Height - annot.TargetY.Value
+                                            : annot.TargetY.Value;
+                                        annotDict.Set("Dest",
+                                            $"[{targetPageDict.Ref} /XYZ 0 {PdfStringHelper.F(pdfTargetY)} 0]");
+                                    }
+                                    else
+                                    {
+                                        annotDict.Set("Dest", $"[{targetPageDict.Ref} /Fit]");
+                                    }
+                                }
+                                break;
+                        }
+
+                        AddObj(annotDict);
+                        annotRefs.Add(annotDict.Ref);
+                    }
+                    pageDicts[page].Set("Annots", "[" + string.Join(" ", annotRefs) + "]");
+                }
             }
 
             // Finalize pages node
@@ -553,6 +623,66 @@ namespace SimpleTinyPDF
         {
             if (uri == null) return "";
             return uri.Replace("\\", "\\\\").Replace("(", "\\(").Replace(")", "\\)");
+        }
+
+        private static string GetTextAnnotationIconName(TextAnnotationIcon icon)
+        {
+            switch (icon)
+            {
+                case TextAnnotationIcon.Comment: return "Comment";
+                case TextAnnotationIcon.Note: return "Note";
+                case TextAnnotationIcon.Key: return "Key";
+                case TextAnnotationIcon.Help: return "Help";
+                case TextAnnotationIcon.NewParagraph: return "NewParagraph";
+                case TextAnnotationIcon.Paragraph: return "Paragraph";
+                case TextAnnotationIcon.Insert: return "Insert";
+                default: return "Comment";
+            }
+        }
+
+        private static string GetMarkupSubtype(MarkupAnnotationType type)
+        {
+            switch (type)
+            {
+                case MarkupAnnotationType.Highlight: return "Highlight";
+                case MarkupAnnotationType.Underline: return "Underline";
+                case MarkupAnnotationType.StrikeOut: return "StrikeOut";
+                default: return "Highlight";
+            }
+        }
+
+        private static string GetStampName(StampType stamp)
+        {
+            switch (stamp)
+            {
+                case StampType.Approved: return "Approved";
+                case StampType.Experimental: return "Experimental";
+                case StampType.NotApproved: return "NotApproved";
+                case StampType.AsIs: return "AsIs";
+                case StampType.Expired: return "Expired";
+                case StampType.NotForPublicRelease: return "NotForPublicRelease";
+                case StampType.Confidential: return "Confidential";
+                case StampType.Final: return "Final";
+                case StampType.Sold: return "Sold";
+                case StampType.Departmental: return "Departmental";
+                case StampType.ForComment: return "ForComment";
+                case StampType.TopSecret: return "TopSecret";
+                case StampType.Draft: return "Draft";
+                case StampType.ForPublicRelease: return "ForPublicRelease";
+                default: return "Draft";
+            }
+        }
+
+        private static string FormatColorArray(PdfColor color)
+        {
+            if (color.IsCmyk)
+            {
+                float r = (1f - color.C) * (1f - color.K);
+                float g = (1f - color.M) * (1f - color.K);
+                float b = (1f - color.Y) * (1f - color.K);
+                return $"[{PdfStringHelper.F(r)} {PdfStringHelper.F(g)} {PdfStringHelper.F(b)}]";
+            }
+            return $"[{PdfStringHelper.F(color.R)} {PdfStringHelper.F(color.G)} {PdfStringHelper.F(color.B)}]";
         }
     }
 }

@@ -547,6 +547,166 @@ namespace SimpleTinyPDF.Tests
                 $"Bold ({wBold:F1}) should be wider than regular ({wRegular:F1})");
         }
 
+        // ── Underline with custom fonts ─────────────────────────────
+
+        [Fact]
+        public void DrawText_CustomFont_Underline_ProducesUnderlineRect()
+        {
+            var font = PdfFontSource.FromFile(FontPath);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("Underlined custom font", 50, 50, font, 14, underline: true);
+            var bytes = doc.ToArray();
+
+            // Underline is rendered as a filled rectangle (re f) in the content stream
+            var pdfText = Encoding.ASCII.GetString(bytes);
+            Assert.Contains("re f", pdfText);
+
+            TestHelper.SavePdf(bytes, "custom_font_underline");
+            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline");
+            Assert.True(bitmap.Width > 0);
+            bitmap.Dispose();
+        }
+
+        [Fact]
+        public void DrawText_CustomFont_Underline_RendersVisibleUnderline()
+        {
+            var font = PdfFontSource.FromFile(FontPath);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("Underlined text", 50, 50, font, 18, underline: true);
+            var bytes = doc.ToArray();
+
+            TestHelper.SavePdf(bytes, "custom_font_underline_visible");
+            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline_visible");
+
+            // Check text area has dark pixels
+            int textY = PtToPx(50);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(250), textY, textY + PtToPx(18)),
+                "Expected visible underlined text");
+
+            // Check underline region (just below the text baseline)
+            int underlineY = PtToPx(50) + PtToPx(18);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(200), underlineY, underlineY + PtToPx(4)),
+                "Expected visible underline below text");
+            bitmap.Dispose();
+        }
+
+        [Fact]
+        public void DrawText_CustomFont_Underline_WithColor()
+        {
+            var font = PdfFontSource.FromFile(FontPath);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("Blue underline", 50, 50, font, 14, PdfColor.Blue, underline: true);
+            var bytes = doc.ToArray();
+
+            TestHelper.SavePdf(bytes, "custom_font_underline_blue");
+            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline_blue");
+            int textY = PtToPx(50);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(200), textY, textY + PtToPx(18)),
+                "Expected visible blue underlined text");
+            bitmap.Dispose();
+        }
+
+        [Fact]
+        public void DrawText_CustomFont_WrappedUnderline()
+        {
+            var font = PdfFontSource.FromFile(FontPath);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText(
+                "This is a longer underlined text that should wrap across multiple lines in the box.",
+                50, 50, font, 12, underline: true, width: 150);
+            var bytes = doc.ToArray();
+
+            // Multiple underline rectangles for wrapped lines
+            var pdfText = Encoding.ASCII.GetString(bytes);
+            int reCount = 0;
+            int idx = 0;
+            while ((idx = pdfText.IndexOf("re f", idx)) >= 0) { reCount++; idx += 4; }
+            Assert.True(reCount > 1, $"Expected multiple underline rects for wrapped text, got {reCount}");
+
+            TestHelper.SavePdf(bytes, "custom_font_underline_wrap");
+            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline_wrap");
+            Assert.True(bitmap.Width > 0);
+            bitmap.Dispose();
+        }
+
+        [Fact]
+        public void RichText_CustomFont_Underline_SpanLevel()
+        {
+            var customFont = PdfFontSource.FromFile(FontPath);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText(new[]
+            {
+                new TextSpan("Normal ", PdfFont.Helvetica, 14),
+                new TextSpan("Underlined custom", customFont, 14, PdfColor.Red, underline: true),
+                new TextSpan(" not underlined", customFont, 14),
+            }, 50, 50);
+            var bytes = doc.ToArray();
+
+            // Only the middle span should produce an underline rect
+            var pdfText = Encoding.ASCII.GetString(bytes);
+            Assert.Contains("re f", pdfText);
+
+            TestHelper.SavePdf(bytes, "custom_font_underline_richtext");
+            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline_richtext");
+            int textY = PtToPx(50);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(400), textY, textY + PtToPx(14)),
+                "Expected visible rich text with underlined custom font span");
+            bitmap.Dispose();
+        }
+
+        [Fact]
+        public void RichText_CustomFont_WrappedUnderline()
+        {
+            var customFont = PdfFontSource.FromFile(FontPath);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText(new[]
+            {
+                new TextSpan("This underlined custom font text should wrap across lines in the box",
+                    customFont, 12, PdfColor.Navy, underline: true),
+            }, 50, 50, width: 180);
+            var bytes = doc.ToArray();
+
+            TestHelper.SavePdf(bytes, "custom_font_underline_richtext_wrap");
+            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline_richtext_wrap");
+            // Multiple lines should be visible
+            int y1 = PtToPx(50);
+            int y2 = PtToPx(65);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(230), y1, y1 + PtToPx(12)),
+                "Expected visible wrapped underlined text line 1");
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(230), y2, y2 + PtToPx(12)),
+                "Expected visible wrapped underlined text line 2");
+            bitmap.Dispose();
+        }
+
+        [Theory]
+        [InlineData("OpenSans-Bold.ttf")]
+        [InlineData("OpenSans-Italic.ttf")]
+        [InlineData("SourceCodePro-Regular.otf")]
+        [InlineData("SourceSerifPro-Regular.otf")]
+        public void Underline_MultipleCustomFonts_AllRender(string filename)
+        {
+            var path = Path.Combine("TestAssets", filename);
+            var font = PdfFontSource.FromFile(path);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText($"Underlined {filename}", 50, 50, font, 16, underline: true);
+            var bytes = doc.ToArray();
+
+            var testName = $"underline_{Path.GetFileNameWithoutExtension(filename)}";
+            TestHelper.SavePdf(bytes, testName);
+            var bitmap = TestHelper.RasterizePage(bytes, testName);
+            int textY = PtToPx(50);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(350), textY, textY + PtToPx(16)),
+                $"Expected visible underlined text for {filename}");
+            bitmap.Dispose();
+        }
+
         // ── Multi-font PDF showcase ─────────────────────────────────
 
         [Fact]

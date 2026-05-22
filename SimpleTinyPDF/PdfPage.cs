@@ -21,7 +21,7 @@ namespace SimpleTinyPDF
         private int _nextFontId = 1;
         private int _nextImageId = 1;
         private int _nextGsId = 1;
-        private readonly List<LinkAnnotation> _linkAnnotations = new List<LinkAnnotation>();
+        private readonly List<PageAnnotation> _annotations = new List<PageAnnotation>();
         internal PdfDocument Document { get; set; }
 
         /// <summary>Page width in points.</summary>
@@ -47,7 +47,7 @@ namespace SimpleTinyPDF
         internal Dictionary<float, string> GetUsedGraphicsStates() => _usedGraphicsStates;
         internal string GetContentStream() => _content.ToString();
         internal StringBuilder GetContentBuilder() => _content;
-        internal IReadOnlyList<LinkAnnotation> GetLinkAnnotations() => _linkAnnotations;
+        internal IReadOnlyList<PageAnnotation> GetAnnotations() => _annotations;
 
         internal EncodingExtension GetOrCreateEncodingExtension(PdfFontSource font)
         {
@@ -954,8 +954,9 @@ namespace SimpleTinyPDF
         private void AddLinkAnnotation(string url, float drawX, float pdfY, float width, float fontSize)
         {
             if (string.IsNullOrEmpty(url)) return;
-            _linkAnnotations.Add(new LinkAnnotation
+            _annotations.Add(new PageAnnotation
             {
+                Kind = AnnotationKind.Link,
                 X0 = drawX,
                 Y0 = pdfY - fontSize * 0.1f,
                 X1 = drawX + width,
@@ -963,11 +964,110 @@ namespace SimpleTinyPDF
                 Url = url
             });
         }
-    }
 
-    internal struct LinkAnnotation
-    {
-        internal float X0, Y0, X1, Y1;
-        internal string Url;
+        // ── Annotations (public API) ─────────────────────────────
+
+        /// <summary>
+        /// Adds a text (sticky note) annotation at the specified position.
+        /// The annotation appears as a small icon; clicking it reveals the note text.
+        /// </summary>
+        public void AddTextAnnotation(float x, float y, string contents,
+            string title = null,
+            TextAnnotationIcon icon = TextAnnotationIcon.Comment,
+            PdfColor? color = null, bool open = false)
+        {
+            if (contents == null) throw new ArgumentNullException(nameof(contents));
+            const float iconSize = 24f;
+            float pdfY = CoordinateOrigin == CoordinateOrigin.TopDown
+                ? Height - y - iconSize
+                : y;
+            _annotations.Add(new PageAnnotation
+            {
+                Kind = AnnotationKind.Text,
+                X0 = x,
+                Y0 = pdfY,
+                X1 = x + iconSize,
+                Y1 = pdfY + iconSize,
+                Contents = contents,
+                Title = title,
+                Icon = icon,
+                Color = color,
+                Open = open
+            });
+        }
+
+        /// <summary>
+        /// Adds a markup annotation (highlight, underline, or strikeout) over a rectangular region.
+        /// </summary>
+        public void AddMarkupAnnotation(float x, float y, float width, float height,
+            MarkupAnnotationType type = MarkupAnnotationType.Highlight,
+            PdfColor? color = null, string contents = null, string title = null)
+        {
+            float pdfY = CoordinateOrigin == CoordinateOrigin.TopDown
+                ? Height - y - height
+                : y;
+            float x0 = x, y0 = pdfY, x1 = x + width, y1 = pdfY + height;
+            // QuadPoints in Acrobat-compatible order: UL, UR, LL, LR
+            var qp = new float[] { x0, y1, x1, y1, x0, y0, x1, y0 };
+            _annotations.Add(new PageAnnotation
+            {
+                Kind = AnnotationKind.Markup,
+                X0 = x0,
+                Y0 = y0,
+                X1 = x1,
+                Y1 = y1,
+                MarkupType = type,
+                QuadPoints = qp,
+                Color = color,
+                Contents = contents,
+                Title = title
+            });
+        }
+
+        /// <summary>
+        /// Adds a stamp annotation at the specified position and size.
+        /// </summary>
+        public void AddStampAnnotation(float x, float y, float width, float height,
+            StampType stamp = StampType.Draft,
+            string contents = null, string title = null, PdfColor? color = null)
+        {
+            float pdfY = CoordinateOrigin == CoordinateOrigin.TopDown
+                ? Height - y - height
+                : y;
+            _annotations.Add(new PageAnnotation
+            {
+                Kind = AnnotationKind.Stamp,
+                X0 = x,
+                Y0 = pdfY,
+                X1 = x + width,
+                Y1 = pdfY + height,
+                Stamp = stamp,
+                Contents = contents,
+                Title = title,
+                Color = color
+            });
+        }
+
+        /// <summary>
+        /// Adds an internal link annotation that navigates to another page in the document.
+        /// </summary>
+        public void AddLinkToPage(float x, float y, float width, float height,
+            PdfPage targetPage, float? targetY = null)
+        {
+            if (targetPage == null) throw new ArgumentNullException(nameof(targetPage));
+            float pdfY = CoordinateOrigin == CoordinateOrigin.TopDown
+                ? Height - y - height
+                : y;
+            _annotations.Add(new PageAnnotation
+            {
+                Kind = AnnotationKind.InternalLink,
+                X0 = x,
+                Y0 = pdfY,
+                X1 = x + width,
+                Y1 = pdfY + height,
+                TargetPage = targetPage,
+                TargetY = targetY
+            });
+        }
     }
 }
