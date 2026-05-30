@@ -9,9 +9,9 @@
     <PackageId>SimpleTinyPDF</PackageId>
     <Version>0.56.0</Version>
     <Authors>Greg Salzman</Authors>
-    <Description>A tiny, zero-dependency PDF generation library for .NET</Description>
+    <Description>A small-but-mighty, zero-dependency PDF generation library for .NET</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>pdf;barcode;dotnet;report;invoice;label;letter</PackageTags>
+    <PackageTags>pdf;barcode;dotnet;report;invoice;label;letter;zero-dependency</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/gregsalzman/simpletinypdf</PackageProjectUrl>
     <RepositoryUrl>https://github.com/gregsalzman/simpletinypdf.git</RepositoryUrl>

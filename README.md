@@ -837,7 +837,7 @@ Built-in `PdfFont` values are automatically converted to `PdfFontSource`, so all
 
 | Version | Date | Changes |
 |---|---|---|
-| 0.56 | May 22, 2026 | Add AES-128 and AES-256 PDF encryption with user/owner passwords and permission flags. Pure C# implementation using built-in System.Security.Cryptography. |
+| 0.56 | May 29, 2026 | Add AES-128 and AES-256 PDF encryption with user/owner passwords and permission flags. Pure C# implementation using built-in System.Security.Cryptography. |
 | 0.55 | May 22, 2026 | Add annotations: text (sticky notes), markup (highlight, underline, strikeout), stamps (14 predefined types), and internal links (GoTo page navigation). |
 | 0.54 | May 21, 2026 | Add TrueType (.ttf) and OpenType (.otf) font embedding via `PdfFontSource.FromFile()` / `FromBytes()` / `FromStream()` with full Unicode support (BMP + supplementary planes) using CID composite fonts with Identity-H encoding. Supports CJK, Cyrillic, Greek, CJK Extension B, enclosed alphanumerics, and any character the font contains. UTF-16 surrogate pairs are handled transparently. Embedded ToUnicode CMap enables text selection/copy in PDF viewers. |
 | 0.53 | May 14, 2026 | Add barcode and QR code support (Code 128, Code 39, EAN-13, UPC-A, QR Code) with vector rendering and configurable options.  Also did some code reorganization and optimization.  Text methods are now consolidated into a single method with overloads... legacy methods are marked as obsolete. |
