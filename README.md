@@ -908,7 +908,7 @@ doc.Save("sales-report.pdf");
 
 | Version | Date | Changes |
 |---|---|---|
-| 0.57 | May 29, 2026 | Add TrueType font subsetting — only used glyphs are embedded, dramatically reducing PDF size for large fonts (especially CJK). Composite glyph dependencies are resolved automatically. CFF/OpenType fonts continue to embed in full. |
+| 0.57 | May 31, 2026 | Add TrueType font subsetting — only used glyphs are embedded, dramatically reducing PDF size for large fonts (especially CJK). Composite glyph dependencies are resolved automatically. CFF/OpenType fonts continue to embed in full. |
 | 0.56 | May 29, 2026 | Add AES-128 and AES-256 PDF encryption with user/owner passwords and permission flags. Pure C# implementation using built-in System.Security.Cryptography. |
 | 0.55 | May 22, 2026 | Add annotations: text (sticky notes), markup (highlight, underline, strikeout), stamps (14 predefined types), and internal links (GoTo page navigation). |
 | 0.54 | May 21, 2026 | Add TrueType (.ttf) and OpenType (.otf) font embedding via `PdfFontSource.FromFile()` / `FromBytes()` / `FromStream()` with full Unicode support (BMP + supplementary planes) using CID composite fonts with Identity-H encoding. Supports CJK, Cyrillic, Greek, CJK Extension B, enclosed alphanumerics, and any character the font contains. UTF-16 surrogate pairs are handled transparently. Embedded ToUnicode CMap enables text selection/copy in PDF viewers. |
