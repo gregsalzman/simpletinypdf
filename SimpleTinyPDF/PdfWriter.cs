@@ -278,19 +278,20 @@ namespace SimpleTinyPDF
                         // Deduplicate: reuse entire Type0 font object tree if already embedded
                         if (!customFontObjects.TryGetValue(ttf, out var cached))
                         {
-                            // Font file stream (full TTF/OTF binary)
+                            // Font file stream (subset TTF binary, or full OTF for CFF)
                             var fontStream = new PdfStream();
-                            fontStream.Data = ttf.RawData;
+                            var subsetData = ttf.GetSubsetData(fontSource.Subset);
+                            fontStream.Data = subsetData;
                             if (ttf.IsCff)
                                 fontStream.Set("Subtype", "/OpenType");
                             else
-                                fontStream.Set("Length1", ttf.RawData.Length.ToString());
+                                fontStream.Set("Length1", subsetData.Length.ToString());
                             AddObj(fontStream);
 
                             // FontDescriptor
                             var descriptor = new PdfDict();
                             descriptor.Set("Type", "/FontDescriptor");
-                            descriptor.Set("FontName", "/" + ttf.PostScriptName);
+                            descriptor.Set("FontName", "/" + ttf.SubsetPostScriptName);
                             descriptor.Set("Flags", ttf.Flags.ToString());
                             descriptor.Set("FontBBox",
                                 $"[{ttf.FontBBox[0]} {ttf.FontBBox[1]} {ttf.FontBBox[2]} {ttf.FontBBox[3]}]");
@@ -315,7 +316,7 @@ namespace SimpleTinyPDF
                             var cidFont = new PdfDict();
                             cidFont.Set("Type", "/Font");
                             cidFont.Set("Subtype", ttf.IsCff ? "/CIDFontType0" : "/CIDFontType2");
-                            cidFont.Set("BaseFont", "/" + ttf.PostScriptName);
+                            cidFont.Set("BaseFont", "/" + ttf.SubsetPostScriptName);
                             cidFont.Set("CIDSystemInfo",
                                 "<< /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>");
                             cidFont.Set("FontDescriptor", descriptor.Ref);
@@ -330,7 +331,7 @@ namespace SimpleTinyPDF
                             var type0Font = new PdfDict();
                             type0Font.Set("Type", "/Font");
                             type0Font.Set("Subtype", "/Type0");
-                            type0Font.Set("BaseFont", "/" + ttf.PostScriptName);
+                            type0Font.Set("BaseFont", "/" + ttf.SubsetPostScriptName);
                             type0Font.Set("Encoding", "/Identity-H");
                             type0Font.Set("DescendantFonts", "[" + cidFont.Ref + "]");
                             type0Font.Set("ToUnicode", toUnicodeCMap.Ref);

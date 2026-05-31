@@ -1,8 +1,31 @@
 # SimpleTinyPDF
 
-A small-but-mighty zero-dependency PDF generation library for .NET.
+[![NuGet](https://img.shields.io/nuget/v/SimpleTinyPDF)](https://www.nuget.org/packages/SimpleTinyPDF)
+
+A small-but-mighty zero-dependency PDF generation library for .NET.  SimpleTinyPDF is faster and uses less memory than most alternative packages.  It doesn't do everything, but likely does what you need.
 
 SimpleTinyPDF lets you create PDF documents from C# with no external packages. It targets .NET Standard 2.0, so it works with .NET Framework 4.6.1+, .NET Core 2.0+, and .NET 5+. 
+
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Pros and Cons](#pros-and-cons)
+- [Size Comparison](#size-comparison)
+- [Performance Comparison](#performance-comparison)
+- [API Reference](#api-reference)
+  - [PdfDocument](#pdfdocument)
+  - [PdfPage](#pdfpage) — [Text](#text) · [Shapes](#shapes) · [Images](#images) · [Tables](#tables) · [Lists](#lists)
+  - [PdfColor](#pdfcolor)
+  - [PageSize](#pagesize)
+  - [Bookmarks](#bookmarks)
+  - [Annotations](#annotations)
+  - [Encryption](#encryption)
+  - [Barcodes](#barcodes)
+- [Example: Invoice with Company Logo](#example-invoice-with-company-logo)
+- [Example: CSV to Table Report](#example-csv-to-table-report)
+- [Version History](#version-history)
+- [License](#license)
 
 ## Features
 
@@ -11,17 +34,36 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 - **Tables** — styled headers, column alignment, alternate row shading, auto-pagination with repeated headers, CSV import
 - **Barcodes** — Code 128, Code 39, EAN-13, UPC-A, and QR Code; pure vector rendering (no images); configurable colors, quiet zones, human-readable text, rotation, and opacity
 - **Lists** — bullet, numbered, lowercase Roman (i, ii, iii…), and uppercase Roman (I, II, III…); unlimited nesting with per-level style overrides and custom bullet symbols; automatic text wrapping and multi-page flow
-- **Shapes** — lines, rectangles (stroke and/or fill)
-- **Rotation** — rotate any text, image, or shape element by an arbitrary angle
+- **Shapes** — lines, rectangles (stroke and/or fill), with optional rotation
 - **Bookmarks** — hierarchical outline / table of contents
 - **Annotations** — text (sticky notes), markup (highlight, underline, strikeout), stamps (Approved, Draft, Confidential, etc.), and internal links (navigate to another page)
 - **Encryption** — AES-128 and AES-256 password protection with configurable user/owner passwords and granular permission flags (print, copy, modify, annotate, etc.)
-- **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) plus TrueType (.ttf) and OpenType (.otf) font embedding with full Unicode support including supplementary planes (CJK, Cyrillic, Greek, Arabic, CJK Extension B, enclosed alphanumerics, etc.)
+- **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) plus TrueType (.ttf) and OpenType (.otf) font embedding with full Unicode support including supplementary planes (CJK, Cyrillic, Greek, Arabic, CJK Extension B, enclosed alphanumerics, etc.). TrueType fonts are automatically subsetted to include only the glyphs used in the document
 - **Colors** — RGB, CMYK, and grayscale
 - **Page sizes** — A3, A4, A5, Letter, Legal, custom dimensions, landscape
 - **Coordinates** — top-down (default) or native PDF bottom-up
 - **Metadata** — document title and author
 - **Zero dependencies** — no NuGet packages, no native libraries
+
+## Quick Start
+
+```
+dotnet add package SimpleTinyPDF
+```
+
+```csharp
+using SimpleTinyPDF;
+
+var doc = new PdfDocument { Title = "Hello World" };
+var page = doc.AddPage();
+
+page.DrawText("Hello, World!", 50, 50, PdfFont.HelveticaBold, 24);
+page.DrawText("Generated with SimpleTinyPDF.", 50, 80);
+
+doc.Save("hello.pdf");
+```
+
+See the full [Invoice example](#example-invoice-with-company-logo) and [CSV Table Report example](#example-csv-to-table-report) for more realistic usage.
 
 ## Pros and Cons
 
@@ -47,13 +89,39 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~115 KB** | **~115 KB** | **1x** | No |
-| **PDFsharp** 6.2.4 | ~4.4 MB | ~4.5 MB | 39x | No |
+| **SimpleTinyPDF** | **~120 KB** | **~120 KB** | **1x** | No |
+| **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 52x | No |
 | **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 130x | No (BouncyCastle ~8 MB) |
 | **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 313x | Yes (bundled Skia) |
 | **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 2,174x | Yes (bundled Chromium) |
 
-IronPDF's footprint includes the Chromium rendering engine downloaded at build/runtime. QuestPDF bundles custom Skia native binaries for cross-platform rendering.
+PDFsharp is shown with MigraDoc (its document-model layer) since most real-world usage relies on MigraDoc for tables, paragraphs, and auto-pagination — raw PDFsharp alone is ~4.4 MB. IronPDF's footprint includes the Chromium rendering engine downloaded at build/runtime. QuestPDF bundles custom Skia native binaries for cross-platform rendering.
+
+## Performance Comparison
+
+Benchmarked with [BenchmarkDotNet](https://benchmarkdotnet.org/) on Windows 11, Intel Core 7 150U (10 cores), .NET 9.0.16. All output is generated in-memory (`byte[]`). IronPDF could not be benchmarked (requires a commercial license in Release builds). PDFsharp is benchmarked via MigraDoc (its document-model layer with tables, paragraphs, and auto-pagination) for a fair API-level comparison. See the [SimpleTinyPDF.Benchmarks](SimpleTinyPDF.Benchmarks/) project to run these yourself.
+
+**Scenario 1 — 10,000-row CSV table** (landscape, auto-paginated with header repeat and alternate row shading):
+
+| Library | Mean | Allocated | vs SimpleTinyPDF |
+|---|---|---|---|
+| **SimpleTinyPDF** | **163 ms** | **173 MB** | **1x** |
+| **PDFsharp + MigraDoc** 6.2.4 | 4,465 ms | 845 MB | 27x slower |
+| **iText** 9.6.0 | 6,987 ms | 1,986 MB | 43x slower |
+| **QuestPDF** 2026.5 | 1,303 ms | 284 MB | 8x slower |
+| **IronPDF** 2026.5 | N/A | N/A | — |
+
+**Scenario 2 — 1,000-invoice batch** (each invoice: header, details, 3-row line items table, totals, footer):
+
+| Library | Mean | Allocated | vs SimpleTinyPDF |
+|---|---|---|---|
+| **SimpleTinyPDF** | **107 ms** | **74 MB** | **1x** |
+| **PDFsharp + MigraDoc** 6.2.4 | 727 ms | 559 MB | 7x slower |
+| **iText** 9.6.0 | 2,671 ms | 1,062 MB | 25x slower |
+| **QuestPDF** 2026.5 | 975 ms | 224 MB | 9x slower |
+| **IronPDF** 2026.5 | N/A | N/A | — |
+
+SimpleTinyPDF is the fastest library in both scenarios while offering a high-level API (built-in tables, CSV import, auto-pagination). QuestPDF is closest in the invoice scenario but allocates 3x more memory. MigraDoc and iText provide richer layout engines but are 7–43x slower with 5–11x more memory allocation.
 
 ## API Reference
 
@@ -105,7 +173,7 @@ page.CoordinateOrigin = CoordinateOrigin.BottomUp;
 
 In `BottomUp` mode, Y values map directly to PDF coordinates: text Y is the baseline, and rectangle/image Y is the bottom-left corner. Tables (`DrawTable`) always use top-down layout internally.
 
-**Text**
+#### Text
 
 ```csharp
 page.DrawText("Hello", 50, 50);
@@ -156,6 +224,8 @@ page.DrawText("Rotated text box", 300, 200, width: 150, rotation: 90);
 | `DrawText(spans, ...)` | float | Rich text (mixed formatting); pass `width` for word wrap |
 | `MeasureText(text, font, size)` | float | Width of text in points |
 
+All text methods accept an optional `rotation` parameter — angle in degrees, clockwise (matching CSS convention), rotating around the element's `(x, y)` position.
+
 **TextSpan** is used with the spans overload of `DrawText` for mixed-format text:
 
 ```csharp
@@ -166,11 +236,90 @@ new TextSpan("click me", PdfFont.Helvetica, 12, PdfColor.Blue, underline: true,
     link: "https://example.com")                               // hyperlink
 ```
 
-**Custom Fonts (TrueType / OpenType)** — Load `.ttf` / `.otf` files via `PdfFontSource.FromFile()` and use them anywhere a built-in font is accepted. Full Unicode support including CJK, Cyrillic, and supplementary planes. See [Fonts](#fonts) for details and examples.
-
 **TextAlignment:** `TextAlignment.Left` (default), `TextAlignment.Center`, `TextAlignment.Right`
 
-**Shapes**
+**Built-in Fonts**
+
+SimpleTinyPDF includes the 14 standard PDF Type 1 fonts. These are built into every PDF viewer and require no embedding, keeping output files small.
+
+| Family | Variants |
+|---|---|
+| Helvetica | Regular, Bold, Oblique, BoldOblique |
+| Times | Roman, Bold, Italic, BoldItalic |
+| Courier | Regular, Bold, Oblique, BoldOblique |
+| Symbol | (symbol characters) |
+| ZapfDingbats | (decorative symbols) |
+
+Use them via the `PdfFont` enum:
+
+```csharp
+page.DrawText("Hello", 50, 50, PdfFont.HelveticaBold, 14);
+```
+
+**Custom Fonts (TrueType / OpenType)**
+
+Load any `.ttf` or `.otf` font file and use it anywhere a built-in font is accepted. The font binary is embedded in the PDF using CID (composite) fonts with Identity-H encoding, enabling full Unicode support — including BMP (CJK, Cyrillic, Greek) and supplementary planes (CJK Extension B, enclosed alphanumerics, etc.). UTF-16 surrogate pairs are handled transparently.
+
+```csharp
+// Load from file, byte array, or stream
+var roboto = PdfFontSource.FromFile("Roboto-Regular.ttf");
+var mono = PdfFontSource.FromBytes(File.ReadAllBytes("SourceCodePro-Regular.otf"));
+var serif = PdfFontSource.FromStream(fontStream);
+
+// Use with any drawing method — Latin, CJK, Cyrillic, etc.
+page.DrawText("Custom font text", 50, 50, roboto, 14);
+page.DrawText("Кириллица", 50, 70, roboto, 14);      // Cyrillic
+
+var cjkFont = PdfFontSource.FromFile("NotoSansJP-Regular.ttf");
+page.DrawText("こんにちは世界", 50, 90, cjkFont, 14); // Japanese
+
+// Mix with built-in fonts in rich text
+page.DrawText(new[] {
+    new TextSpan("Hello ", PdfFont.HelveticaBold, 14),
+    new TextSpan("世界", cjkFont, 14, PdfColor.Red)
+}, 50, 120);
+
+// Use in tables
+table.HeaderFont = roboto;
+table.CellFont = roboto;
+```
+
+Built-in `PdfFont` values are automatically converted to `PdfFontSource`, so all existing code continues to work unchanged. The same `PdfFontSource` instance can be used across multiple pages — the font data is embedded only once in the PDF. TrueType fonts are automatically subsetted to include only the glyphs used in the document. Text rendered with custom fonts is selectable and copyable in PDF viewers (via an embedded ToUnicode CMap).
+
+**Character Support**
+
+*Built-in fonts:*
+- WinAnsiEncoding coverage (~256 Latin characters, digits, punctuation)
+- Extended European diacritics (e.g. ą, ć, ę, ł, ň, ř, š, ž, ő, ű) via encoding extensions
+
+*Custom fonts (TrueType / OpenType):*
+- Full Unicode Basic Multilingual Plane (BMP) — U+0000 to U+FFFF
+- Supplementary Unicode planes — U+10000 to U+10FFFF (CJK Extension B, enclosed alphanumerics, etc.)
+- CJK characters (Chinese, Japanese, Korean)
+- Cyrillic, Greek, Arabic characters, and other scripts
+- Any character the font contains a glyph for
+
+**Font Subsetting**
+
+TrueType (`.ttf`) fonts are automatically subsetted when embedded in the PDF. Only the glyphs actually used in the document are included, dramatically reducing file size — especially for large CJK fonts (e.g. a 16 MB font embedding just a few characters produces a PDF well under 1 MB). Composite glyphs (like accented characters built from components) are handled correctly; all referenced component glyphs are automatically retained.
+
+To disable subsetting and embed the full font file, set `Subset` to `false`:
+
+```csharp
+var font = PdfFontSource.FromFile("Roboto-Regular.ttf");
+font.Subset = false; // embed the full font binary
+```
+
+OpenType (`.otf`) fonts with CFF outlines are currently embedded in full.
+
+**What Is Not Supported**
+
+- Right-to-left text layout (Arabic and Hebrew characters render, but layout is left-to-right)
+- Complex script shaping (ligatures, combining marks)
+- CFF/OpenType font subsetting (the full font file is embedded; TrueType fonts are subsetted)
+- WOFF/WOFF2 web font formats
+
+#### Shapes
 
 ```csharp
 page.DrawLine(50, 100, 500, 100, PdfColor.Black, lineWidth: 0.5f);
@@ -183,10 +332,20 @@ page.DrawRectangle(300, 200, 80, 80, PdfColor.Green, lineWidth: 2, rotation: 30)
 page.DrawLine(100, 300, 300, 300, PdfColor.Red, lineWidth: 2, rotation: 90);
 ```
 
-**Images**
+All shape methods accept an optional `rotation` parameter — angle in degrees, clockwise, rotating around the element's `(x, y)` position.
+
+#### Images
 
 ```csharp
-var logo = PdfImage.FromFile("logo.png");
+var img = PdfImage.FromFile("photo.jpg");
+var img = PdfImage.FromBytes(byteArray);
+var img = PdfImage.FromStream(stream);
+
+int w = img.PixelWidth;   // display width (EXIF-adjusted)
+int h = img.PixelHeight;  // display height (EXIF-adjusted)
+```
+
+```csharp
 page.DrawImage(logo, x: 50, y: 30, width: 120, height: 40);
 page.DrawImage(logo, x: 50, y: 30, width: 120, height: 40, opacity: 0.5f);
 page.DrawImage(logo, x: 50, y: 30, width: 120, height: 40, scaleMode: ImageScaleMode.Fit);
@@ -205,21 +364,49 @@ The `scaleMode` parameter controls how the image is scaled to fit the target rec
 | `Fit` | Preserved | Scales to fit inside the area; image is centered with possible letterboxing |
 | `Fill` | Preserved | Scales to cover the entire area; image is centered and overflow is clipped |
 
-**Rotation**
+`DrawImage` also accepts an optional `rotation` parameter — angle in degrees, clockwise, rotating around the element's `(x, y)` position.
 
-All drawing methods (`DrawText`, `DrawImage`, `DrawLine`, `DrawRectangle`, `DrawFilledRectangle`) accept an optional `rotation` parameter:
+#### Tables
 
-- **Angle** is in degrees, clockwise (matching CSS convention)
-- **Origin** is the element's `(x, y)` position
-- Default is `0` (no rotation)
+Build tables with a fluent API or import from CSV.
 
 ```csharp
-// Watermark-style diagonal text
-page.DrawText("DRAFT", 300, 400, PdfFont.HelveticaBold, 72,
-    PdfColor.Rgb(200, 200, 200), TextAlignment.Center, opacity: 0.3f, rotation: -45);
+var table = new PdfTable(100, 200, 100, 100)  // column widths in points
+    .SetHeaders("ID", "Description", "Qty", "Price")
+    .AddRow("1001", "Widget", "5", "$12.50")
+    .AddRow("1002", "Gadget", "2", "$24.00");
+
+table.SetColumnAlignment(2, TextAlignment.Right);
+table.SetColumnAlignment(3, TextAlignment.Right);
+table.AlternateRowShading = true;
 ```
 
-**Tables**
+| Property | Default | Description |
+|---|---|---|
+| `HeaderFont` | HelveticaBold | Font for header row |
+| `HeaderFontSize` | 10 | Font size for header row |
+| `CellFont` | Helvetica | Font for body cells |
+| `CellFontSize` | 10 | Font size for body cells |
+| `HeaderBackground` | LightGray | Header row background color |
+| `HeaderTextColor` | Black | Header text color |
+| `BorderColor` | Black | Border color |
+| `BorderWidth` | 0.5 | Border line width in points |
+| `CellPadding` | 4 | Padding inside cells in points |
+| `TextColor` | Black | Body text color |
+| `AlternateRowShading` | false | Enable zebra-stripe rows |
+| `AlternateRowColor` | RGB(0.95, 0.95, 0.95) | Alternate row background |
+| `LineSpacing` | 1.2 | Line spacing multiplier for cell text |
+
+**CSV import:**
+
+```csharp
+var table = PdfTable.FromCsv("data.csv");
+var table = PdfTable.FromCsv("data.csv", firstRowIsHeader: true, delimiter: ',',
+    columnWidths: new float[] { 80, 200, 80, 80 });
+var table = PdfTable.FromCsvString(csvContent, totalWidth: 500);
+```
+
+**Drawing tables:**
 
 ```csharp
 float endY = page.DrawTable(table, x: 50, y: 200, bottomMargin: 50);
@@ -232,7 +419,7 @@ Tables that exceed the page height automatically continue on new pages with repe
 page.DrawTable(table, x: 50, y: 300, continuationY: 50);
 ```
 
-**Lists**
+#### Lists
 
 `DrawList` renders a hierarchical list and returns a `(PdfPage page, float y)` tuple indicating where rendering ended, so you can continue drawing below it — including on a different page if the list overflowed.
 
@@ -313,57 +500,6 @@ new ListItem("Top item", ListStyle.Bullet, new TextSpan("‣", PdfFont.Helvetica
 | `indentPerLevel` | 20 | Horizontal indent per nesting level in points |
 | `continuationY` | same as `y` | Y position on continuation pages |
 
-### PdfTable
-
-Build tables with a fluent API or import from CSV.
-
-```csharp
-var table = new PdfTable(100, 200, 100, 100)  // column widths in points
-    .SetHeaders("ID", "Description", "Qty", "Price")
-    .AddRow("1001", "Widget", "5", "$12.50")
-    .AddRow("1002", "Gadget", "2", "$24.00");
-
-table.SetColumnAlignment(2, TextAlignment.Right);
-table.SetColumnAlignment(3, TextAlignment.Right);
-table.AlternateRowShading = true;
-```
-
-| Property | Default | Description |
-|---|---|---|
-| `HeaderFont` | HelveticaBold | Font for header row |
-| `HeaderFontSize` | 10 | Font size for header row |
-| `CellFont` | Helvetica | Font for body cells |
-| `CellFontSize` | 10 | Font size for body cells |
-| `HeaderBackground` | LightGray | Header row background color |
-| `HeaderTextColor` | Black | Header text color |
-| `BorderColor` | Black | Border color |
-| `BorderWidth` | 0.5 | Border line width in points |
-| `CellPadding` | 4 | Padding inside cells in points |
-| `TextColor` | Black | Body text color |
-| `AlternateRowShading` | false | Enable zebra-stripe rows |
-| `AlternateRowColor` | RGB(0.95, 0.95, 0.95) | Alternate row background |
-| `LineSpacing` | 1.2 | Line spacing multiplier for cell text |
-
-**CSV import:**
-
-```csharp
-var table = PdfTable.FromCsv("data.csv");
-var table = PdfTable.FromCsv("data.csv", firstRowIsHeader: true, delimiter: ',',
-    columnWidths: new float[] { 80, 200, 80, 80 });
-var table = PdfTable.FromCsvString(csvContent, totalWidth: 500);
-```
-
-### PdfImage
-
-```csharp
-var img = PdfImage.FromFile("photo.jpg");
-var img = PdfImage.FromBytes(byteArray);
-var img = PdfImage.FromStream(stream);
-
-int w = img.PixelWidth;   // display width (EXIF-adjusted)
-int h = img.PixelHeight;  // display height (EXIF-adjusted)
-```
-
 ### PdfColor
 
 ```csharp
@@ -373,7 +509,10 @@ var c3 = PdfColor.Cmyk(1f, 0f, 0f, 0f);     // CMYK
 var c4 = PdfColor.Gray(0.5f);               // grayscale
 ```
 
-Predefined colors:
+Predefined: `Black`, `White`, `Red`, `Green`, `Blue`, `Yellow`, `Cyan`, `Magenta`, `Orange`, `Purple`, `Pink`, `Brown`, `Gold`, `Navy`, `Teal`, `Maroon`, `Olive`, `Coral`, `Crimson`, `Indigo`, `Silver`, `MediumGray`, `LightGray`, `DarkGray`
+
+<details>
+<summary>Predefined color values</summary>
 
 | Name | Value | Color Space |
 |---|---|---|
@@ -401,6 +540,8 @@ Predefined colors:
 | `MediumGray` | 128, 128, 128 | RGB |
 | `LightGray` | 212, 212, 212 | RGB |
 | `DarkGray` | 84, 84, 84 | RGB |
+
+</details>
 
 ### PageSize
 
@@ -763,80 +904,11 @@ page.DrawTable(table, 50, 100, bottomMargin: 50, continuationY: 50);
 doc.Save("sales-report.pdf");
 ```
 
-## Fonts
-
-### Built-in Fonts
-
-SimpleTinyPDF includes the 14 standard PDF Type 1 fonts. These are built into every PDF viewer and require no embedding, keeping output files small.
-
-| Family | Variants |
-|---|---|
-| Helvetica | Regular, Bold, Oblique, BoldOblique |
-| Times | Roman, Bold, Italic, BoldItalic |
-| Courier | Regular, Bold, Oblique, BoldOblique |
-| Symbol | (symbol characters) |
-| ZapfDingbats | (decorative symbols) |
-
-Use them via the `PdfFont` enum:
-
-```csharp
-page.DrawText("Hello", 50, 50, PdfFont.HelveticaBold, 14);
-```
-
-### Custom Fonts (TrueType / OpenType)
-
-Load any `.ttf` or `.otf` font file and use it anywhere a built-in font is accepted. The font binary is embedded in the PDF using CID (composite) fonts with Identity-H encoding, enabling full Unicode support — including BMP (CJK, Cyrillic, Greek) and supplementary planes (CJK Extension B, enclosed alphanumerics, etc.). UTF-16 surrogate pairs are handled transparently.
-
-```csharp
-// Load from file, byte array, or stream
-var roboto = PdfFontSource.FromFile("Roboto-Regular.ttf");
-var mono = PdfFontSource.FromBytes(File.ReadAllBytes("SourceCodePro-Regular.otf"));
-var serif = PdfFontSource.FromStream(fontStream);
-
-// Use with any drawing method — Latin, CJK, Cyrillic, etc.
-page.DrawText("Custom font text", 50, 50, roboto, 14);
-page.DrawText("Кириллица", 50, 70, roboto, 14);      // Cyrillic
-
-var cjkFont = PdfFontSource.FromFile("NotoSansJP-Regular.ttf");
-page.DrawText("こんにちは世界", 50, 90, cjkFont, 14); // Japanese
-
-// Mix with built-in fonts in rich text
-page.DrawText(new[] {
-    new TextSpan("Hello ", PdfFont.HelveticaBold, 14),
-    new TextSpan("世界", cjkFont, 14, PdfColor.Red)
-}, 50, 120);
-
-// Use in tables
-table.HeaderFont = roboto;
-table.CellFont = roboto;
-```
-
-Built-in `PdfFont` values are automatically converted to `PdfFontSource`, so all existing code continues to work unchanged. The same `PdfFontSource` instance can be used across multiple pages — the font data is embedded only once in the PDF. Text rendered with custom fonts is selectable and copyable in PDF viewers (via an embedded ToUnicode CMap).
-
-### Character Support
-
-**Built-in fonts:**
-- WinAnsiEncoding coverage (~256 Latin characters, digits, punctuation)
-- Extended European diacritics (e.g. ą, ć, ę, ł, ň, ř, š, ž, ő, ű) via encoding extensions
-
-**Custom fonts (TrueType / OpenType):**
-- Full Unicode Basic Multilingual Plane (BMP) — U+0000 to U+FFFF
-- Supplementary Unicode planes — U+10000 to U+10FFFF (CJK Extension B, enclosed alphanumerics, etc.)
-- CJK characters (Chinese, Japanese, Korean)
-- Cyrillic, Greek, Arabic characters, and other scripts
-- Any character the font contains a glyph for
-
-### What Is Not Supported
-
-- Right-to-left text layout (Arabic and Hebrew characters render, but layout is left-to-right)
-- Complex script shaping (ligatures, combining marks)
-- Font subsetting (the full font file is embedded)
-- WOFF/WOFF2 web font formats
-
 ## Version History
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.57 | May 29, 2026 | Add TrueType font subsetting — only used glyphs are embedded, dramatically reducing PDF size for large fonts (especially CJK). Composite glyph dependencies are resolved automatically. CFF/OpenType fonts continue to embed in full. |
 | 0.56 | May 29, 2026 | Add AES-128 and AES-256 PDF encryption with user/owner passwords and permission flags. Pure C# implementation using built-in System.Security.Cryptography. |
 | 0.55 | May 22, 2026 | Add annotations: text (sticky notes), markup (highlight, underline, strikeout), stamps (14 predefined types), and internal links (GoTo page navigation). |
 | 0.54 | May 21, 2026 | Add TrueType (.ttf) and OpenType (.otf) font embedding via `PdfFontSource.FromFile()` / `FromBytes()` / `FromStream()` with full Unicode support (BMP + supplementary planes) using CID composite fonts with Identity-H encoding. Supports CJK, Cyrillic, Greek, CJK Extension B, enclosed alphanumerics, and any character the font contains. UTF-16 surrogate pairs are handled transparently. Embedded ToUnicode CMap enables text selection/copy in PDF viewers. |
@@ -847,7 +919,7 @@ Built-in `PdfFont` values are automatically converted to `PdfFontSource`, so all
 
 ## Development Notes
 
-This library was written as an exploration of what my increasingly good friend Claude could acomplish.  I continue to be amazed at what generative AI can do.
+This library was written as an exploration of what my increasingly good friend Claude could accomplish.  I continue to be amazed at what generative AI can do.
 
 Sample image assets in the tests project are taken from https://www.publicdomainpictures.net/
 

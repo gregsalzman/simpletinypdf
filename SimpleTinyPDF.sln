@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleTinyPDF", "SimpleTiny
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleTinyPDF.Tests", "SimpleTinyPDF.Tests\SimpleTinyPDF.Tests.csproj", "{FEFF44EF-3B33-40BF-877D-AEA192269959}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleTinyPDF.Benchmarks", "SimpleTinyPDF.Benchmarks\SimpleTinyPDF.Benchmarks.csproj", "{3A89D639-B3F8-443D-B77E-C3BE0B670E84}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,18 @@ Global
 		{FEFF44EF-3B33-40BF-877D-AEA192269959}.Release|x64.Build.0 = Release|Any CPU
 		{FEFF44EF-3B33-40BF-877D-AEA192269959}.Release|x86.ActiveCfg = Release|Any CPU
 		{FEFF44EF-3B33-40BF-877D-AEA192269959}.Release|x86.Build.0 = Release|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Debug|x64.Build.0 = Debug|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Debug|x86.Build.0 = Debug|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Release|x64.ActiveCfg = Release|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Release|x64.Build.0 = Release|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Release|x86.ActiveCfg = Release|Any CPU
+		{3A89D639-B3F8-443D-B77E-C3BE0B670E84}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -24,10 +24,15 @@ namespace SimpleTinyPDF
         internal bool IsCff { get; private set; }
         internal bool IsFixedPitch { get; private set; }
 
+        internal string SubsetTag { get; set; }
+        internal string SubsetPostScriptName =>
+            SubsetTag != null ? SubsetTag + "+" + PostScriptName : PostScriptName;
+
         private ushort[] _advanceWidths;
         private int _numOfLongHorMetrics;
         private Dictionary<int, int> _cmapTable; // Unicode codepoint -> glyph ID
         private readonly HashSet<int> _usedCharacters = new HashSet<int>();
+        private Dictionary<string, (uint offset, uint length)> _tables;
 
         internal TrueTypeFont(byte[] data)
         {
@@ -131,6 +136,25 @@ namespace SimpleTinyPDF
             return set;
         }
 
+        /// <summary>
+        /// Returns a subset of the font binary containing only the used glyphs.
+        /// For CFF fonts or when subsetting is disabled, returns the full RawData.
+        /// </summary>
+        internal byte[] GetSubsetData(bool subset)
+        {
+            if (!subset || IsCff)
+                return RawData;
+
+            var usedGlyphIds = GetUsedGlyphIds();
+            if (usedGlyphIds.Count == 0)
+                return RawData;
+
+            if (SubsetTag == null)
+                SubsetTag = TrueTypeSubsetter.GenerateSubsetTag();
+
+            return TrueTypeSubsetter.Subset(RawData, usedGlyphIds, _tables);
+        }
+
         private void Parse()
         {
             if (RawData.Length < 12)
@@ -151,6 +175,8 @@ namespace SimpleTinyPDF
                 uint length = ReadUInt32(pos + 12);
                 tables[tag] = (offset, length);
             }
+
+            _tables = tables;
 
             ParseHead(tables);
             ParseHhea(tables);

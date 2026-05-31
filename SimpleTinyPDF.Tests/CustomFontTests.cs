@@ -441,7 +441,8 @@ namespace SimpleTinyPDF.Tests
             var pdfText = Encoding.ASCII.GetString(bytes);
             Assert.Contains("/Subtype /Type0", pdfText);
             Assert.Contains("/FontFile2", pdfText);
-            Assert.Contains("/" + font.CustomFont.PostScriptName, pdfText);
+            // Subset fonts use a tag prefix (e.g. ABCDEF+FontName)
+            Assert.Contains(font.CustomFont.PostScriptName, pdfText);
         }
 
         // ── OTF (CFF) fonts ────────────────────────────────────────

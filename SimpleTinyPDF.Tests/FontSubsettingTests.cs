@@ -1,0 +1,270 @@
+using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+using Xunit;
+
+namespace SimpleTinyPDF.Tests
+{
+    public class FontSubsettingTests
+    {
+        private static readonly string FontPath =
+            Path.Combine("TestAssets", "Roboto-Regular.ttf");
+
+        private static int PtToPx(float pt, int dpi = 150) => (int)(pt * dpi / 72.0);
+
+        private static bool HasDarkPixelsInRegion(SkiaSharp.SKBitmap bitmap,
+            int xMin, int xMax, int yMin, int yMax)
+        {
+            xMax = System.Math.Min(xMax, bitmap.Width - 1);
+            yMax = System.Math.Min(yMax, bitmap.Height - 1);
+            for (int x = xMin; x <= xMax; x++)
+                for (int y = yMin; y <= yMax; y++)
+                {
+                    var p = bitmap.GetPixel(x, y);
+                    if (p.Red < 200 || p.Green < 200 || p.Blue < 200)
+                        return true;
+                }
+            return false;
+        }
+
+        // ── Size reduction ──────────────────────────────────────────
+
+        [Fact]
+        public void SubsetFont_ProducesSmallerPdf()
+        {
+            var font = PdfFontSource.FromFile(FontPath);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("Hi", 50, 50, font, 12);
+            var pdfBytes = doc.ToArray();
+
+            var fontFileSize = new FileInfo(FontPath).Length;
+            Assert.True(pdfBytes.Length < fontFileSize,
+                $"Subset PDF ({pdfBytes.Length}) should be smaller than full font file ({fontFileSize})");
+        }
+
+        [Fact]
+        public void SubsetFont_CjkFont_DramaticSizeReduction()
+        {
+            var cjkPath = Path.Combine("TestAssets", "NotoSansJP-Regular.ttf");
+            if (!File.Exists(cjkPath)) return;
+
+            var font = PdfFontSource.FromFile(cjkPath);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("\u3053\u3093\u306B\u3061\u306F", 50, 50, font, 24);
+            var bytes = doc.ToArray();
+
+            // NotoSansJP is ~16MB; subset PDF with 5 chars should be much smaller
+            Assert.True(bytes.Length < 1_000_000,
+                $"CJK subset PDF ({bytes.Length} bytes) should be well under 1MB");
+        }
+
+        [Fact]
+        public void SubsetFont_CjkFont_RendersAndIsSmall()
+        {
+            var cjkPath = Path.Combine("TestAssets", "NotoSansJP-Regular.ttf");
+            if (!File.Exists(cjkPath)) return;
+
+            var fullFontSize = new FileInfo(cjkPath).Length;
+            var font = PdfFontSource.FromFile(cjkPath);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+
+            // Mix of hiragana, katakana, kanji, and Latin
+            page.DrawText("\u6771\u4EAC\u90FD Tokyo", 50, 50, font, 28);          // 東京都 Tokyo
+            page.DrawText("\u304A\u306F\u3088\u3046\u3054\u3056\u3044\u307E\u3059", 50, 90, font, 20); // おはようございます
+            page.DrawText("\u30B3\u30FC\u30D2\u30FC", 50, 120, font, 20);          // コーヒー
+
+            var bytes = doc.ToArray();
+
+            // Verify dramatic size reduction vs full 16MB font
+            Assert.True(bytes.Length < fullFontSize / 10,
+                $"Subset PDF ({bytes.Length}) should be <10% of full font ({fullFontSize})");
+
+            // Verify all three lines render
+            TestHelper.SavePdf(bytes, "subset_cjk_large");
+            var bitmap = TestHelper.RasterizePage(bytes, "subset_cjk_large");
+
+            int y1 = PtToPx(50);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), y1, y1 + PtToPx(28)),
+                "Kanji/Latin line should render");
+
+            int y2 = PtToPx(90);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), y2, y2 + PtToPx(20)),
+                "Hiragana line should render");
+
+            int y3 = PtToPx(120);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(200), y3, y3 + PtToPx(20)),
+                "Katakana line should render");
+
+            bitmap.Dispose();
+        }
+
+        // ── Subset tag naming ───────────────────────────────────────
+
+        [Fact]
+        public void SubsetTag_IsSixUppercaseLetters()
+        {
+            var tag = TrueTypeSubsetter.GenerateSubsetTag();
+            Assert.Equal(6, tag.Length);
+            Assert.Matches("^[A-Z]{6}$", tag);
+        }
+
+        [Fact]
+        public void SubsetFont_PdfContainsSubsetTagPrefix()
+        {
+            var font = PdfFontSource.FromFile(FontPath);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("Test", 50, 50, font, 12);
+            var bytes = doc.ToArray();
+
+            var pdfText = Encoding.ASCII.GetString(bytes);
+            // Should contain a subset tag like /ABCDEF+FontName
+            Assert.Matches(new Regex(@"/[A-Z]{6}\+"), pdfText);
+        }
+
+        [Fact]
+        public void SubsetFont_CffFont_NoSubsetTag()
+        {
+            var font = PdfFontSource.FromFile(Path.Combine("TestAssets", "SourceCodePro-Regular.otf"));
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("Test", 50, 50, font, 12);
+            var bytes = doc.ToArray();
+
+            var pdfText = Encoding.ASCII.GetString(bytes);
+            // CFF fonts should not be subsetted — no tag prefix
+            Assert.Contains("/FontFile3", pdfText);
+            Assert.Contains("/" + font.CustomFont.PostScriptName, pdfText);
+        }
+
+        // ── Visual regression ───────────────────────────────────────
+
+        [Theory]
+        [InlineData("Roboto-Regular.ttf")]
+        [InlineData("OpenSans-Regular.ttf")]
+        [InlineData("Inconsolata-Regular.ttf")]
+        public void SubsetFont_RendersVisibleText(string filename)
+        {
+            var path = Path.Combine("TestAssets", filename);
+            var font = PdfFontSource.FromFile(path);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("Hello World!", 50, 50, font, 18);
+            var bytes = doc.ToArray();
+
+            var testName = $"subset_{Path.GetFileNameWithoutExtension(filename)}";
+            TestHelper.SavePdf(bytes, testName);
+            var bitmap = TestHelper.RasterizePage(bytes, testName);
+            int textY = PtToPx(50);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), textY, textY + PtToPx(18)),
+                $"Subset font {filename} should render visible text");
+            bitmap.Dispose();
+        }
+
+        [Fact]
+        public void SubsetFont_AccentedCharacters_CompositeGlyphsPreserved()
+        {
+            var font = PdfFontSource.FromFile(FontPath);
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("\u00E9\u00E8\u00EA\u00EB", 50, 50, font, 24);
+            var bytes = doc.ToArray();
+
+            TestHelper.SavePdf(bytes, "subset_composite");
+            var bitmap = TestHelper.RasterizePage(bytes, "subset_composite");
+            int textY = PtToPx(50);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(200), textY, textY + PtToPx(24)),
+                "Composite (accented) characters should render correctly with subsetting");
+            bitmap.Dispose();
+        }
+
+        // ── Deduplication ───────────────────────────────────────────
+
+        [Fact]
+        public void SubsetFont_MultiPage_SingleFontStream()
+        {
+            var font = PdfFontSource.FromFile(FontPath);
+            var doc = new PdfDocument();
+            var page1 = doc.AddPage(PageSize.A4);
+            page1.DrawText("Page 1", 50, 50, font, 12);
+            var page2 = doc.AddPage(PageSize.A4);
+            page2.DrawText("Page 2", 50, 50, font, 12);
+            var bytes = doc.ToArray();
+
+            var pdfText = Encoding.ASCII.GetString(bytes);
+            int fontFileCount = 0;
+            int idx = 0;
+            while ((idx = pdfText.IndexOf("/FontFile2", idx)) >= 0)
+            {
+                fontFileCount++;
+                idx += 10;
+            }
+            Assert.Equal(1, fontFileCount);
+        }
+
+        // ── Opt-out ───────────────────────────────────────────────────
+
+        [Fact]
+        public void SubsetFont_DisabledViaProperty_EmbedsFullFont()
+        {
+            var font = PdfFontSource.FromFile(FontPath);
+            font.Subset = false;
+
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("Hi", 50, 50, font, 12);
+            var fullBytes = doc.ToArray();
+
+            // Compare with subsetted version
+            var fontSubset = PdfFontSource.FromFile(FontPath);
+            var doc2 = new PdfDocument();
+            var page2 = doc2.AddPage(PageSize.A4);
+            page2.DrawText("Hi", 50, 50, fontSubset, 12);
+            var subsetBytes = doc2.ToArray();
+
+            Assert.True(fullBytes.Length > subsetBytes.Length,
+                $"Full embed ({fullBytes.Length}) should be larger than subset ({subsetBytes.Length})");
+
+            // Full embed should not have a subset tag prefix
+            var pdfText = System.Text.Encoding.ASCII.GetString(fullBytes);
+            Assert.Contains("/" + font.CustomFont.PostScriptName, pdfText);
+            Assert.DoesNotMatch(new System.Text.RegularExpressions.Regex(@"/[A-Z]{6}\+"), pdfText);
+        }
+
+        [Fact]
+        public void SubsetFont_DisabledViaProperty_StillRendersCorrectly()
+        {
+            var font = PdfFontSource.FromFile(FontPath);
+            font.Subset = false;
+
+            var doc = new PdfDocument();
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("Hello World!", 50, 50, font, 18);
+            var bytes = doc.ToArray();
+
+            TestHelper.SavePdf(bytes, "no_subset");
+            var bitmap = TestHelper.RasterizePage(bytes, "no_subset");
+            int textY = PtToPx(50);
+            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), textY, textY + PtToPx(18)),
+                "Full-embed font should render visible text");
+            bitmap.Dispose();
+        }
+
+        // ── Encryption combination ──────────────────────────────────
+
+        [Fact]
+        public void SubsetFont_WithEncryption_ProducesValidPdf()
+        {
+            var font = PdfFontSource.FromFile(FontPath);
+            var doc = new PdfDocument();
+            doc.Encryption = new PdfEncryptionOptions { UserPassword = "test" };
+            var page = doc.AddPage(PageSize.A4);
+            page.DrawText("Encrypted subset", 50, 50, font, 18);
+            var bytes = doc.ToArray();
+            Assert.True(bytes.Length > 100);
+        }
+    }
+}

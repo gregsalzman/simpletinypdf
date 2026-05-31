@@ -32,6 +32,14 @@ namespace SimpleTinyPDF
             _custom = font ?? throw new ArgumentNullException(nameof(font));
         }
 
+        /// <summary>
+        /// Gets or sets whether this font should be subsetted when embedded in the PDF.
+        /// When true (the default), only the glyphs actually used in the document are
+        /// embedded, significantly reducing file size. Set to false to embed the full font.
+        /// Only applies to TrueType (.ttf) fonts; CFF/OpenType (.otf) fonts are always embedded in full.
+        /// </summary>
+        public bool Subset { get; set; } = true;
+
         /// <summary>Whether this is one of the 14 standard PDF Type 1 fonts.</summary>
         internal bool IsBuiltIn => _builtIn.HasValue;
 
