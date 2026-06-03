@@ -39,7 +39,7 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 - **Annotations** — text (sticky notes), markup (highlight, underline, strikeout), stamps (Approved, Draft, Confidential, etc.), and internal links (navigate to another page)
 - **Encryption** — AES-128 and AES-256 password protection with configurable user/owner passwords and granular permission flags (print, copy, modify, annotate, etc.)
 - **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) plus TrueType (.ttf) and OpenType (.otf) font embedding with full Unicode support including supplementary planes (CJK, Cyrillic, Greek, Arabic, CJK Extension B, enclosed alphanumerics, etc.). TrueType fonts are automatically subsetted to include only the glyphs used in the document
-- **Colors** — RGB, CMYK, and grayscale
+- **Colors** — RGB, CMYK, grayscale, and spot colors (Separation) with CMYK fallback and tint control
 - **Page sizes** — A3, A4, A5, Letter, Legal, custom dimensions, landscape
 - **Coordinates** — top-down (default) or native PDF bottom-up
 - **Metadata** — document title and author
@@ -509,6 +509,25 @@ var c3 = PdfColor.Cmyk(1f, 0f, 0f, 0f);     // CMYK
 var c4 = PdfColor.Gray(0.5f);               // grayscale
 ```
 
+**Spot Colors (Separation)**
+
+Spot colors represent named inks used in professional printing (e.g., PANTONE colors). Each spot color has a name and a CMYK fallback for on-screen display. Spot colors work everywhere a regular `PdfColor` is accepted — text, shapes, tables, etc.
+
+```csharp
+// Define a spot color with CMYK display fallback
+var pantone = PdfColor.Spot("PANTONE 185 C", c: 0f, m: 0.91f, y: 0.76f, k: 0f);
+
+// Use anywhere a PdfColor is accepted
+page.DrawFilledRectangle(50, 50, 200, 100, pantone);
+page.DrawText("Spot color text", 50, 200, color: pantone);
+
+// Tint control (0.0 = no ink, 1.0 = full ink)
+var light = pantone.WithTint(0.5f);          // 50% tint of the same ink
+var custom = PdfColor.Spot("Brand Blue", 1f, 0.5f, 0f, 0f, tint: 0.75f);
+```
+
+In the generated PDF, spot colors are written as `/Separation` color spaces with a Type 2 tint transform function. Different tints of the same ink share a single color space object, and the same spot color is deduplicated across pages.
+
 Predefined: `Black`, `White`, `Red`, `Green`, `Blue`, `Yellow`, `Cyan`, `Magenta`, `Orange`, `Purple`, `Pink`, `Brown`, `Gold`, `Navy`, `Teal`, `Maroon`, `Olive`, `Coral`, `Crimson`, `Indigo`, `Silver`, `MediumGray`, `LightGray`, `DarkGray`
 
 <details>
@@ -908,6 +927,7 @@ doc.Save("sales-report.pdf");
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.58 | June 2, 2026 | Add spot color (Separation) support with named inks, CMYK display fallback, and tint control. Spot colors work everywhere `PdfColor` is accepted. |
 | 0.57 | May 31, 2026 | Add TrueType font subsetting — only used glyphs are embedded, dramatically reducing PDF size for large fonts (especially CJK). Composite glyph dependencies are resolved automatically. CFF/OpenType fonts continue to embed in full. |
 | 0.56 | May 29, 2026 | Add AES-128 and AES-256 PDF encryption with user/owner passwords and permission flags. Pure C# implementation using built-in System.Security.Cryptography. |
 | 0.55 | May 22, 2026 | Add annotations: text (sticky notes), markup (highlight, underline, strikeout), stamps (14 predefined types), and internal links (GoTo page navigation). |

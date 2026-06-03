@@ -1,7 +1,9 @@
+using System;
+
 namespace SimpleTinyPDF
 {
     /// <summary>
-    /// Represents a color in either RGB or CMYK color space for use in PDF rendering.
+    /// Represents a color in RGB, CMYK, or spot (Separation) color space for use in PDF rendering.
     /// </summary>
     public readonly struct PdfColor
     {
@@ -15,37 +17,75 @@ namespace SimpleTinyPDF
         /// <summary>Blue component (0.0 - 1.0). Only meaningful for RGB colors.</summary>
         public float B { get; }
 
-        /// <summary>Cyan component (0.0 - 1.0). Only meaningful for CMYK colors.</summary>
+        /// <summary>Cyan component (0.0 - 1.0). Only meaningful for CMYK and spot colors.</summary>
         public float C { get; }
-        /// <summary>Magenta component (0.0 - 1.0). Only meaningful for CMYK colors.</summary>
+        /// <summary>Magenta component (0.0 - 1.0). Only meaningful for CMYK and spot colors.</summary>
         public float M { get; }
-        /// <summary>Yellow component (0.0 - 1.0). Only meaningful for CMYK colors.</summary>
+        /// <summary>Yellow component (0.0 - 1.0). Only meaningful for CMYK and spot colors.</summary>
         public float Y { get; }
-        /// <summary>Key/Black component (0.0 - 1.0). Only meaningful for CMYK colors.</summary>
+        /// <summary>Key/Black component (0.0 - 1.0). Only meaningful for CMYK and spot colors.</summary>
         public float K { get; }
 
-        private PdfColor(float r, float g, float b, float c, float m, float y, float k, bool isCmyk)
+        /// <summary>Spot color name (e.g. "PANTONE 185 C"). Null for RGB/CMYK colors.</summary>
+        public string SpotColorName { get; }
+
+        /// <summary>Tint value (0.0 = no ink, 1.0 = full ink). Only meaningful for spot colors.</summary>
+        public float Tint { get; }
+
+        /// <summary>True if this is a spot (Separation) color.</summary>
+        public bool IsSpotColor => SpotColorName != null;
+
+        private PdfColor(float r, float g, float b, float c, float m, float y, float k, bool isCmyk,
+            string spotColorName, float tint)
         {
             R = r; G = g; B = b;
             C = c; M = m; Y = y; K = k;
             IsCmyk = isCmyk;
+            SpotColorName = spotColorName;
+            Tint = tint;
         }
 
         /// <summary>Creates an RGB color from 0-255 integer values.</summary>
         public static PdfColor Rgb(int r, int g, int b) =>
-            new PdfColor(r / 255f, g / 255f, b / 255f, 0, 0, 0, 0, false);
+            new PdfColor(r / 255f, g / 255f, b / 255f, 0, 0, 0, 0, false, null, 1f);
 
         /// <summary>Creates an RGB color from 0.0-1.0 float values.</summary>
         public static PdfColor Rgb(float r, float g, float b) =>
-            new PdfColor(r, g, b, 0, 0, 0, 0, false);
+            new PdfColor(r, g, b, 0, 0, 0, 0, false, null, 1f);
 
         /// <summary>Creates a CMYK color from 0.0-1.0 float values.</summary>
         public static PdfColor Cmyk(float c, float m, float y, float k) =>
-            new PdfColor(0, 0, 0, c, m, y, k, true);
+            new PdfColor(0, 0, 0, c, m, y, k, true, null, 1f);
 
         /// <summary>Creates a grayscale color (RGB shorthand).</summary>
         public static PdfColor Gray(float brightness) =>
-            new PdfColor(brightness, brightness, brightness, 0, 0, 0, 0, false);
+            new PdfColor(brightness, brightness, brightness, 0, 0, 0, 0, false, null, 1f);
+
+        /// <summary>
+        /// Creates a spot (Separation) color with a CMYK display fallback.
+        /// </summary>
+        /// <param name="name">Spot color name (e.g. "PANTONE 185 C").</param>
+        /// <param name="c">Cyan fallback component (0.0 - 1.0).</param>
+        /// <param name="m">Magenta fallback component (0.0 - 1.0).</param>
+        /// <param name="y">Yellow fallback component (0.0 - 1.0).</param>
+        /// <param name="k">Key/Black fallback component (0.0 - 1.0).</param>
+        /// <param name="tint">Tint value (0.0 = no ink, 1.0 = full ink). Default: 1.0.</param>
+        public static PdfColor Spot(string name, float c, float m, float y, float k, float tint = 1f)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            return new PdfColor(0, 0, 0, c, m, y, k, true, name, Math.Max(0f, Math.Min(1f, tint)));
+        }
+
+        /// <summary>
+        /// Returns a new spot color with the same ink definition but a different tint.
+        /// Only valid for spot colors.
+        /// </summary>
+        public PdfColor WithTint(float tint)
+        {
+            if (SpotColorName == null)
+                throw new InvalidOperationException("WithTint can only be used on spot colors.");
+            return new PdfColor(0, 0, 0, C, M, Y, K, true, SpotColorName, Math.Max(0f, Math.Min(1f, tint)));
+        }
 
         /// <summary>Black (CMYK).</summary>
         public static readonly PdfColor Black = Cmyk(0f, 0f, 0f, 1f);

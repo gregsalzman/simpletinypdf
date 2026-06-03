@@ -17,10 +17,12 @@ namespace SimpleTinyPDF
         private readonly Dictionary<string, PdfFontSource> _usedFonts = new Dictionary<string, PdfFontSource>();
         private readonly Dictionary<string, PdfImage> _usedImages = new Dictionary<string, PdfImage>();
         private readonly Dictionary<float, string> _usedGraphicsStates = new Dictionary<float, string>();
+        private readonly Dictionary<string, PdfColor> _usedSpotColors = new Dictionary<string, PdfColor>();
         private readonly Dictionary<PdfFontSource, EncodingExtension> _encodingExtensions = new Dictionary<PdfFontSource, EncodingExtension>();
         private int _nextFontId = 1;
         private int _nextImageId = 1;
         private int _nextGsId = 1;
+        private int _nextCsId = 1;
         private readonly List<PageAnnotation> _annotations = new List<PageAnnotation>();
         internal PdfDocument Document { get; set; }
 
@@ -45,6 +47,7 @@ namespace SimpleTinyPDF
         internal Dictionary<string, PdfFontSource> GetUsedFonts() => _usedFonts;
         internal Dictionary<string, PdfImage> GetUsedImages() => _usedImages;
         internal Dictionary<float, string> GetUsedGraphicsStates() => _usedGraphicsStates;
+        internal Dictionary<string, PdfColor> GetUsedSpotColors() => _usedSpotColors;
         internal string GetContentStream() => _content.ToString();
         internal StringBuilder GetContentBuilder() => _content;
         internal IReadOnlyList<PageAnnotation> GetAnnotations() => _annotations;
@@ -108,6 +111,18 @@ namespace SimpleTinyPDF
             return id;
         }
 
+        private string EnsureSpotColor(PdfColor spot)
+        {
+            foreach (var kv in _usedSpotColors)
+            {
+                if (kv.Value.SpotColorName == spot.SpotColorName)
+                    return kv.Key;
+            }
+            var id = "CS" + _nextCsId++;
+            _usedSpotColors[id] = spot;
+            return id;
+        }
+
         private void AppendOpacity(float opacity)
         {
             if (opacity >= 1f) return;
@@ -144,7 +159,13 @@ namespace SimpleTinyPDF
 
         private void AppendColorFill(PdfColor color)
         {
-            if (color.IsCmyk)
+            if (color.IsSpotColor)
+            {
+                var csId = EnsureSpotColor(color);
+                _content.AppendFormat(CultureInfo.InvariantCulture,
+                    "/{0} cs {1} scn\n", csId, F(color.Tint));
+            }
+            else if (color.IsCmyk)
                 _content.AppendFormat(CultureInfo.InvariantCulture,
                     "{0} {1} {2} {3} k\n", F(color.C), F(color.M), F(color.Y), F(color.K));
             else
@@ -154,7 +175,13 @@ namespace SimpleTinyPDF
 
         private void AppendColorStroke(PdfColor color)
         {
-            if (color.IsCmyk)
+            if (color.IsSpotColor)
+            {
+                var csId = EnsureSpotColor(color);
+                _content.AppendFormat(CultureInfo.InvariantCulture,
+                    "/{0} CS {1} SCN\n", csId, F(color.Tint));
+            }
+            else if (color.IsCmyk)
                 _content.AppendFormat(CultureInfo.InvariantCulture,
                     "{0} {1} {2} {3} K\n", F(color.C), F(color.M), F(color.Y), F(color.K));
             else

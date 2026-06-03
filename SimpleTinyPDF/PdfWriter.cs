@@ -56,6 +56,15 @@ namespace SimpleTinyPDF
         }
     }
 
+    internal class PdfArray : PdfObj
+    {
+        internal string Value;
+        internal override void WriteTo(PdfBinaryWriter w)
+        {
+            w.WriteAscii(Value + "\n");
+        }
+    }
+
     internal class PdfBinaryWriter
     {
         private readonly Stream _stream;
@@ -239,6 +248,7 @@ namespace SimpleTinyPDF
             // 5. ExtGState objects (deduplicated across pages by opacity value)
             var gsObjects = new Dictionary<float, PdfDict>();
             var customFontObjects = new Dictionary<TrueTypeFont, (PdfStream stream, PdfDict descriptor, PdfDict type0Font)>();
+            var spotColorObjects = new Dictionary<string, PdfObj>();
 
             // 6. Pages
             var pageObjRefs = new List<string>();
@@ -364,6 +374,33 @@ namespace SimpleTinyPDF
                     gsRefParts.Add($"/{gsId} {gsObj.Ref}");
                 }
 
+                // Spot color (Separation) objects for this page
+                var usedSpotColors = page.GetUsedSpotColors();
+                var csRefParts = new List<string>();
+                foreach (var kv in usedSpotColors)
+                {
+                    string csId = kv.Key;
+                    var spot = kv.Value;
+                    if (!spotColorObjects.TryGetValue(spot.SpotColorName, out var csArrayObj))
+                    {
+                        var tintFunc = new PdfDict();
+                        tintFunc.Set("FunctionType", "2");
+                        tintFunc.Set("Domain", "[0 1]");
+                        tintFunc.Set("C0", "[0 0 0 0]");
+                        tintFunc.Set("C1", $"[{PdfStringHelper.F(spot.C)} {PdfStringHelper.F(spot.M)} {PdfStringHelper.F(spot.Y)} {PdfStringHelper.F(spot.K)}]");
+                        tintFunc.Set("N", "1");
+                        AddObj(tintFunc);
+
+                        var csArray = new PdfArray();
+                        csArray.Value = $"[/Separation /{EscapeSpotName(spot.SpotColorName)} /DeviceCMYK {tintFunc.Ref}]";
+                        AddObj(csArray);
+
+                        spotColorObjects[spot.SpotColorName] = csArray;
+                        csArrayObj = csArray;
+                    }
+                    csRefParts.Add($"/{csId} {csArrayObj.Ref}");
+                }
+
                 // Content stream
                 var contentStream = new PdfStream();
                 contentStream.Data = Encoding.ASCII.GetBytes(page.GetContentStream());
@@ -395,6 +432,14 @@ namespace SimpleTinyPDF
                 {
                     resources.Append("/ExtGState << ");
                     foreach (var part in gsRefParts)
+                        resources.Append(part).Append(' ');
+                    resources.Append(">> ");
+                }
+
+                if (csRefParts.Count > 0)
+                {
+                    resources.Append("/ColorSpace << ");
+                    foreach (var part in csRefParts)
                         resources.Append(part).Append(' ');
                     resources.Append(">> ");
                 }
@@ -642,6 +687,20 @@ namespace SimpleTinyPDF
             w.WriteAscii("startxref\n");
             w.WriteAscii($"{xrefPos}\n");
             w.WriteAscii("%%EOF\n");
+        }
+
+        private static string EscapeSpotName(string name)
+        {
+            var sb = new StringBuilder(name.Length * 2);
+            foreach (char c in name)
+            {
+                if (c > 32 && c < 127 && c != '#' && c != '/' && c != '(' && c != ')'
+                    && c != '<' && c != '>' && c != '[' && c != ']' && c != '{' && c != '}' && c != '%')
+                    sb.Append(c);
+                else
+                    sb.AppendFormat("#{0:X2}", (int)c);
+            }
+            return sb.ToString();
         }
 
         private static string EscapeUri(string uri)
