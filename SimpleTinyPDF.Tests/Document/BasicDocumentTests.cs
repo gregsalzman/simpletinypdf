@@ -8,11 +8,12 @@ namespace SimpleTinyPDF.Tests
         public void BlankPdf_IsValid_RasterizesWithoutError()
         {
             var doc = new PdfDocument();
-            doc.AddPage(PageSize.A4);
+            var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: a blank A4 page renders without error");
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "blank_a4");
-            var bitmap = TestHelper.RasterizePage(bytes, "blank_a4");
+            TestHelper.SavePdf(bytes, "Document/blank-a4-page");
+            var bitmap = TestHelper.RasterizePage(bytes, "Document/blank-a4-page");
             // A4 at 150 DPI: 595*150/72 ≈ 1240px wide, 842*150/72 ≈ 1754px tall
             Assert.True(bitmap.Width > 1200, $"Expected A4 width ~1240px, got {bitmap.Width}");
             Assert.True(bitmap.Height > 1700, $"Expected A4 height ~1754px, got {bitmap.Height}");
@@ -27,12 +28,13 @@ namespace SimpleTinyPDF.Tests
         public void MultiPage_HasCorrectPageCount()
         {
             var doc = new PdfDocument();
-            doc.AddPage(PageSize.A4);
+            var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: document has exactly 3 pages");
             doc.AddPage(PageSize.Letter);
             doc.AddPage(PageSize.A5);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "multi_page");
+            TestHelper.SavePdf(bytes, "Document/three-page-document");
             Assert.Equal(3, TestHelper.GetPageCount(bytes));
         }
 
@@ -40,13 +42,14 @@ namespace SimpleTinyPDF.Tests
         public void DifferentPageSizes_ProduceDifferentDimensions()
         {
             var doc = new PdfDocument();
-            doc.AddPage(PageSize.A4);
+            var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: A4, Letter, and Legal pages have different dimensions");
             doc.AddPage(PageSize.Letter);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "different_sizes");
-            var bitmapA4 = TestHelper.RasterizePage(bytes, "different_sizes", 0);
-            var bitmapLetter = TestHelper.RasterizePage(bytes, "different_sizes", 1);
+            TestHelper.SavePdf(bytes, "Document/mixed-page-sizes");
+            var bitmapA4 = TestHelper.RasterizePage(bytes, "Document/mixed-page-sizes", 0);
+            var bitmapLetter = TestHelper.RasterizePage(bytes, "Document/mixed-page-sizes", 1);
 
             // A4 is taller than Letter (842 vs 792 points)
             Assert.True(bitmapA4.Height > bitmapLetter.Height);
@@ -58,11 +61,12 @@ namespace SimpleTinyPDF.Tests
         public void LandscapePage_IsWiderThanTall()
         {
             var doc = new PdfDocument();
-            doc.AddPage(PageSize.A4.Landscape());
+            var page = doc.AddPage(PageSize.A4.Landscape());
+            TestHelper.AddDescription(page, "Verify: landscape A4 page is wider than tall");
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "landscape_a4");
-            var bitmap = TestHelper.RasterizePage(bytes, "landscape_a4");
+            TestHelper.SavePdf(bytes, "Document/landscape-a4-page");
+            var bitmap = TestHelper.RasterizePage(bytes, "Document/landscape-a4-page");
             Assert.True(bitmap.Width > bitmap.Height);
             bitmap.Dispose();
         }
@@ -75,12 +79,13 @@ namespace SimpleTinyPDF.Tests
                 Title = "Test Title",
                 Author = "Test Author"
             };
-            doc.AddPage();
+            var page = doc.AddPage();
+            TestHelper.AddDescription(page, "Verify: PDF metadata (title, author, subject) is set");
             var bytes = doc.ToArray();
 
             // Verify valid PDF is generated and metadata strings appear in the raw bytes
-            TestHelper.SavePdf(bytes, "metadata");
-            var bitmap = TestHelper.RasterizePage(bytes, "metadata");
+            TestHelper.SavePdf(bytes, "Document/document-with-metadata");
+            var bitmap = TestHelper.RasterizePage(bytes, "Document/document-with-metadata");
             Assert.True(bitmap.Width > 0);
             bitmap.Dispose();
             // Check that metadata strings appear in the PDF bytes

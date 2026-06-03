@@ -9,6 +9,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument { Title = "Invoice #1042" };
             var page = doc.AddPage(PageSize.Letter);
+            TestHelper.AddDescription(page, "Verify: README invoice example produces correct output");
 
             // Company info (right-aligned) — skip logo since no file exists
             page.DrawText("Acme Corp", 562, 40, PdfFont.HelveticaBold, 14, alignment: TextAlignment.Right);
@@ -72,8 +73,8 @@ namespace SimpleTinyPDF.Tests
                 306, 720, PdfFont.HelveticaOblique, 9, PdfColor.DarkGray, TextAlignment.Center);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "readme_invoice");
-            var bitmap = TestHelper.RasterizePage(bytes, "readme_invoice", dpi: 200);
+            TestHelper.SavePdf(bytes, "Integration/readme-example-invoice");
+            var bitmap = TestHelper.RasterizePage(bytes, "Integration/readme-example-invoice", dpi: 200);
             Assert.True(bitmap.Width > 0);
         }
 
@@ -92,6 +93,7 @@ namespace SimpleTinyPDF.Tests
 
             var doc = new PdfDocument { Title = "Quarterly Sales Report" };
             var page = doc.AddPage(PageSize.Letter.Landscape());
+            TestHelper.AddDescription(page, "Verify: README CSV report example produces correct output");
 
             // Report header
             page.DrawText("Quarterly Sales Report", 50, 40, PdfFont.HelveticaBold, 20);
@@ -123,8 +125,8 @@ namespace SimpleTinyPDF.Tests
             page.DrawTable(table, 50, 100, bottomMargin: 50, continuationY: 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "readme_csv_report");
-            var bitmap = TestHelper.RasterizePage(bytes, "readme_csv_report", dpi: 200);
+            TestHelper.SavePdf(bytes, "Integration/readme-example-csv-report");
+            var bitmap = TestHelper.RasterizePage(bytes, "Integration/readme-example-csv-report", dpi: 200);
             Assert.True(bitmap.Width > 0);
         }
     }

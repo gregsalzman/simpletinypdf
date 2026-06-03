@@ -4,23 +4,6 @@ namespace SimpleTinyPDF.Tests
 {
     public class RichTextTests
     {
-        private static int PtToPx(float pt, int dpi = 150) => (int)(pt * dpi / 72.0);
-
-        private static bool HasDarkPixelsInRegion(SkiaSharp.SKBitmap bitmap,
-            int xMin, int xMax, int yMin, int yMax)
-        {
-            xMax = System.Math.Min(xMax, bitmap.Width - 1);
-            yMax = System.Math.Min(yMax, bitmap.Height - 1);
-            for (int x = System.Math.Max(0, xMin); x <= xMax; x++)
-                for (int y = System.Math.Max(0, yMin); y <= yMax; y++)
-                {
-                    var p = bitmap.GetPixel(x, y);
-                    if (p.Red < 200 || p.Green < 200 || p.Blue < 200)
-                        return true;
-                }
-            return false;
-        }
-
         // ── TextSpan Construction ────────────────────────────────
 
         [Fact]
@@ -57,17 +40,18 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: single TextSpan renders like regular DrawText");
             page.DrawText(new[]
             {
                 new TextSpan("Hello World", PdfFont.Helvetica, 24)
             }, 50, 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_single_span");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtext_single_span");
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(250),
-                textY, textY + PtToPx(24)),
+            TestHelper.SavePdf(bytes, "Text/richtext-single-span");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtext-single-span");
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(250),
+                textY, textY + TestHelper.PtToPx(24)),
                 "Expected visible text for single-span rich text");
             bitmap.Dispose();
         }
@@ -77,6 +61,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: TextSpans with different fonts render inline");
             page.DrawText(new[]
             {
                 new TextSpan("Normal ", PdfFont.Helvetica, 14),
@@ -85,10 +70,10 @@ namespace SimpleTinyPDF.Tests
             }, 50, 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_mixed_fonts");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtext_mixed_fonts");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(350),
-                PtToPx(50), PtToPx(64)),
+            TestHelper.SavePdf(bytes, "Text/richtext-mixed-fonts");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtext-mixed-fonts");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(350),
+                TestHelper.PtToPx(50), TestHelper.PtToPx(64)),
                 "Expected visible mixed-font text");
             bitmap.Dispose();
         }
@@ -98,6 +83,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: TextSpans with different colors render inline");
             page.DrawText(new[]
             {
                 new TextSpan("Red ", PdfFont.HelveticaBold, 36, PdfColor.Red),
@@ -105,12 +91,12 @@ namespace SimpleTinyPDF.Tests
             }, 50, 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_mixed_colors");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtext_mixed_colors");
+            TestHelper.SavePdf(bytes, "Text/richtext-mixed-colors");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtext-mixed-colors");
 
             bool foundRed = false;
-            for (int px = PtToPx(50); px < PtToPx(150) && !foundRed; px++)
-                for (int py = PtToPx(50); py < PtToPx(86) && !foundRed; py++)
+            for (int px = TestHelper.PtToPx(50); px < TestHelper.PtToPx(150) && !foundRed; px++)
+                for (int py = TestHelper.PtToPx(50); py < TestHelper.PtToPx(86) && !foundRed; py++)
                 {
                     var p = bitmap.GetPixel(px, py);
                     if (p.Red > 200 && p.Green < 50 && p.Blue < 50)
@@ -119,8 +105,8 @@ namespace SimpleTinyPDF.Tests
             Assert.True(foundRed, "Expected red pixels in first span");
 
             bool foundBlue = false;
-            for (int px = PtToPx(100); px < PtToPx(300) && !foundBlue; px++)
-                for (int py = PtToPx(50); py < PtToPx(86) && !foundBlue; py++)
+            for (int px = TestHelper.PtToPx(100); px < TestHelper.PtToPx(300) && !foundBlue; px++)
+                for (int py = TestHelper.PtToPx(50); py < TestHelper.PtToPx(86) && !foundBlue; py++)
                 {
                     var p = bitmap.GetPixel(px, py);
                     if (p.Blue > 200 && p.Red < 50 && p.Green < 50)
@@ -135,6 +121,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: TextSpans with different sizes render inline");
             page.DrawText(new[]
             {
                 new TextSpan("Big ", PdfFont.Helvetica, 36),
@@ -142,10 +129,10 @@ namespace SimpleTinyPDF.Tests
             }, 50, 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_mixed_sizes");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtext_mixed_sizes");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300),
-                PtToPx(50), PtToPx(86)),
+            TestHelper.SavePdf(bytes, "Text/richtext-mixed-font-sizes");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtext-mixed-font-sizes");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300),
+                TestHelper.PtToPx(50), TestHelper.PtToPx(86)),
                 "Expected visible text with mixed sizes");
             bitmap.Dispose();
         }
@@ -155,6 +142,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: rich text is center-aligned");
             page.DrawText(new[]
             {
                 new TextSpan("Center ", PdfFont.Helvetica, 20),
@@ -162,11 +150,11 @@ namespace SimpleTinyPDF.Tests
             }, page.Width / 2, 50, TextAlignment.Center);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_center");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtext_center");
+            TestHelper.SavePdf(bytes, "Text/richtext-center-aligned");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtext-center-aligned");
             int midX = bitmap.Width / 2;
-            Assert.True(HasDarkPixelsInRegion(bitmap, midX - PtToPx(60), midX + PtToPx(60),
-                PtToPx(50), PtToPx(70)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, midX - TestHelper.PtToPx(60), midX + TestHelper.PtToPx(60),
+                TestHelper.PtToPx(50), TestHelper.PtToPx(70)),
                 "Expected centered rich text near horizontal center");
             bitmap.Dispose();
         }
@@ -191,6 +179,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: single TextSpan wraps in a textbox");
             string text = "This is a paragraph of text that should wrap across multiple lines when drawn in a text box.";
             float endY = page.DrawText(new[]
             {
@@ -200,8 +189,8 @@ namespace SimpleTinyPDF.Tests
             Assert.True(endY > 50, "DrawText should return Y after text");
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtextbox_single_span");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtextbox_single_span");
+            TestHelper.SavePdf(bytes, "Text/richtextbox-single-span-wrapped");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtextbox-single-span-wrapped");
 
             float lineHeight = 12 * 1.2f;
             int linesRendered = (int)((endY - 50) / lineHeight + 0.5f);
@@ -214,6 +203,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: mixed formatting wraps correctly in textbox");
             float endY = page.DrawText(new[]
             {
                 new TextSpan("This is ", PdfFont.Helvetica, 12),
@@ -223,15 +213,15 @@ namespace SimpleTinyPDF.Tests
 
             Assert.True(endY > 50);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtextbox_mixed");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtextbox_mixed");
+            TestHelper.SavePdf(bytes, "Text/richtextbox-mixed-formatting");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtextbox-mixed-formatting");
 
             float lineHeight = 12 * 1.2f;
             int linesRendered = (int)((endY - 50) / lineHeight + 0.5f);
             Assert.True(linesRendered >= 2, $"Expected multiple wrapped lines, got {linesRendered}");
 
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(250),
-                PtToPx(50), PtToPx(62)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(250),
+                TestHelper.PtToPx(50), TestHelper.PtToPx(62)),
                 "Expected text on first line");
             bitmap.Dispose();
         }
@@ -241,6 +231,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: mixed font sizes wrap correctly in textbox");
             float endY = page.DrawText(new[]
             {
                 new TextSpan("Big ", PdfFont.Helvetica, 30),
@@ -249,10 +240,10 @@ namespace SimpleTinyPDF.Tests
 
             Assert.True(endY > 50);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtextbox_mixed_sizes");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtextbox_mixed_sizes");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(250),
-                PtToPx(50), PtToPx(80)),
+            TestHelper.SavePdf(bytes, "Text/richtextbox-mixed-sizes");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtextbox-mixed-sizes");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(250),
+                TestHelper.PtToPx(50), TestHelper.PtToPx(80)),
                 "Expected visible text with mixed sizes");
             bitmap.Dispose();
         }
@@ -262,6 +253,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: colored TextSpans wrap correctly in textbox");
             page.DrawText(new[]
             {
                 new TextSpan("Red text ", PdfFont.HelveticaBold, 24, PdfColor.Red),
@@ -269,12 +261,12 @@ namespace SimpleTinyPDF.Tests
             }, 50, 50, width: 400);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtextbox_colors");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtextbox_colors");
+            TestHelper.SavePdf(bytes, "Text/richtextbox-colored-spans");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtextbox-colored-spans");
 
             bool foundRed = false;
-            for (int px = PtToPx(50); px < PtToPx(200) && !foundRed; px++)
-                for (int py = PtToPx(50); py < PtToPx(74) && !foundRed; py++)
+            for (int px = TestHelper.PtToPx(50); px < TestHelper.PtToPx(200) && !foundRed; px++)
+                for (int py = TestHelper.PtToPx(50); py < TestHelper.PtToPx(74) && !foundRed; py++)
                 {
                     var p = bitmap.GetPixel(px, py);
                     if (p.Red > 200 && p.Green < 50 && p.Blue < 50)
@@ -289,6 +281,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: explicit newlines are preserved in rich textbox");
             float endY = page.DrawText(new[]
             {
                 new TextSpan("Line one\nLine two\nLine three", PdfFont.Helvetica, 12)
@@ -299,14 +292,14 @@ namespace SimpleTinyPDF.Tests
             Assert.Equal(3, linesRendered);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtextbox_newlines");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtextbox_newlines");
+            TestHelper.SavePdf(bytes, "Text/richtextbox-explicit-newlines");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtextbox-explicit-newlines");
 
             for (int line = 0; line < 3; line++)
             {
                 float lineY = 50 + line * lineHeight;
-                Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(250),
-                    PtToPx(lineY), PtToPx(lineY + 12)),
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(250),
+                    TestHelper.PtToPx(lineY), TestHelper.PtToPx(lineY + 12)),
                     $"Expected text on line {line + 1}");
             }
             bitmap.Dispose();
@@ -317,6 +310,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: right-aligned rich text wraps correctly");
             float boxX = 100, boxWidth = 300;
             page.DrawText(new[]
             {
@@ -325,17 +319,17 @@ namespace SimpleTinyPDF.Tests
             }, boxX, 50, TextAlignment.Right, width: boxWidth);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtextbox_right");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtextbox_right");
+            TestHelper.SavePdf(bytes, "Text/richtextbox-right-aligned");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtextbox-right-aligned");
 
-            int rightEdgePx = PtToPx(boxX + boxWidth);
+            int rightEdgePx = TestHelper.PtToPx(boxX + boxWidth);
             float lineHeight = 14 * 1.2f;
             for (int i = 0; i < 2; i++)
             {
                 float lineY = 50 + i * lineHeight;
-                Assert.True(HasDarkPixelsInRegion(bitmap,
-                    rightEdgePx - PtToPx(100), rightEdgePx,
-                    PtToPx(lineY), PtToPx(lineY + 14)),
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                    rightEdgePx - TestHelper.PtToPx(100), rightEdgePx,
+                    TestHelper.PtToPx(lineY), TestHelper.PtToPx(lineY + 14)),
                     $"Expected right-aligned text on line {i + 1}");
             }
             bitmap.Dispose();
@@ -346,6 +340,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: rich text overflows into chained textbox");
             float y = 50;
             y = page.DrawText(new[]
             {
@@ -361,10 +356,10 @@ namespace SimpleTinyPDF.Tests
             }, 50, y, width: 400);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtextbox_chain");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtextbox_chain");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300),
-                PtToPx(50), PtToPx(62)),
+            TestHelper.SavePdf(bytes, "Text/richtextbox-overflow-chain");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtextbox-overflow-chain");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300),
+                TestHelper.PtToPx(50), TestHelper.PtToPx(62)),
                 "Expected first paragraph text");
             bitmap.Dispose();
         }
@@ -388,6 +383,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: complex mixed formatting renders correctly inline");
             page.DrawText(new[]
             {
                 new TextSpan("It's a ", PdfFont.Helvetica, 12),
@@ -396,10 +392,10 @@ namespace SimpleTinyPDF.Tests
             }, 50, 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_users_example");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtext_users_example");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300),
-                PtToPx(50), PtToPx(66)),
+            TestHelper.SavePdf(bytes, "Text/richtext-inline-mixed-example");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtext-inline-mixed-example");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300),
+                TestHelper.PtToPx(50), TestHelper.PtToPx(66)),
                 "Expected visible text for the user's mixed-format example");
             bitmap.Dispose();
         }
@@ -409,6 +405,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: complex mixed formatting wraps correctly in textbox");
             float endY = page.DrawText(new[]
             {
                 new TextSpan("It's a ", PdfFont.Helvetica, 12),
@@ -418,10 +415,10 @@ namespace SimpleTinyPDF.Tests
 
             Assert.True(endY > 50);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtextbox_users_example");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtextbox_users_example");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300),
-                PtToPx(50), PtToPx(66)),
+            TestHelper.SavePdf(bytes, "Text/richtextbox-mixed-example");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtextbox-mixed-example");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300),
+                TestHelper.PtToPx(50), TestHelper.PtToPx(66)),
                 "Expected visible text for the user's mixed-format example in a box");
             bitmap.Dispose();
         }
@@ -447,6 +444,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: individual TextSpans can be underlined");
             page.DrawText(new[]
             {
                 new TextSpan("Normal ", PdfFont.Helvetica, 24),
@@ -454,15 +452,15 @@ namespace SimpleTinyPDF.Tests
             }, 50, 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_underline");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtext_underline");
+            TestHelper.SavePdf(bytes, "Text/richtext-underlined-spans");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtext-underlined-spans");
 
             // The underlined span starts after "Normal " which is ~7 chars wide
             // Check for underline pixels below the text baseline
             float ulTop = 50 + 24; // baseline
             float ulBottom = ulTop + 24 * 0.2f;
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(100), PtToPx(300),
-                PtToPx(ulTop), PtToPx(ulBottom)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(100), TestHelper.PtToPx(300),
+                TestHelper.PtToPx(ulTop), TestHelper.PtToPx(ulBottom)),
                 "Expected underline pixels below the underlined span");
             bitmap.Dispose();
         }
@@ -472,14 +470,15 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: underlined rich text wraps in textbox");
             float endY = page.DrawText(new[]
             {
                 new TextSpan("This underlined text should wrap across lines.", PdfFont.Helvetica, 14, underline: true)
             }, 50, 50, width: 200);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtextbox_underline");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtextbox_underline");
+            TestHelper.SavePdf(bytes, "Text/richtextbox-underlined");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtextbox-underlined");
 
             float lineHeight = 14 * 1.2f;
             int linesRendered = (int)((endY - 50) / lineHeight + 0.5f);
@@ -490,8 +489,8 @@ namespace SimpleTinyPDF.Tests
                 float lineY = 50 + line * lineHeight;
                 float ulTop = lineY + 14;
                 float ulBottom = ulTop + 14 * 0.2f;
-                Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(250),
-                    PtToPx(ulTop), PtToPx(ulBottom)),
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(250),
+                    TestHelper.PtToPx(ulTop), TestHelper.PtToPx(ulBottom)),
                     $"Expected underline on wrapped line {line + 1}");
             }
             bitmap.Dispose();
@@ -502,6 +501,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: only some spans are underlined in rich textbox");
             page.DrawText(new[]
             {
                 new TextSpan("Normal ", PdfFont.Helvetica, 24),
@@ -509,12 +509,12 @@ namespace SimpleTinyPDF.Tests
             }, 50, 50, width: 500);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtextbox_partial_underline");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtextbox_partial_underline");
+            TestHelper.SavePdf(bytes, "Text/richtextbox-partial-underline");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtextbox-partial-underline");
 
             // Both text areas should be visible
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(400),
-                PtToPx(50), PtToPx(74)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(400),
+                TestHelper.PtToPx(50), TestHelper.PtToPx(74)),
                 "Expected visible text");
             bitmap.Dispose();
         }

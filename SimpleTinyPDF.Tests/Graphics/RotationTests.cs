@@ -9,12 +9,13 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: text rotated 90 degrees");
             // Draw text at (200, 100) rotated 90° clockwise
             page.DrawText("Rotated", 200, 100, fontSize: 20, rotation: 90);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "rotation_text_90");
-            var bitmap = TestHelper.RasterizePage(bytes, "rotation_text_90");
+            TestHelper.SavePdf(bytes, "Graphics/rotation-text-90deg");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rotation-text-90deg");
 
             // At 90° clockwise rotation around (200,100), text should extend downward from (200,100)
             // Check that there are dark pixels below the anchor point
@@ -39,11 +40,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: text rotated 45 degrees");
             page.DrawText("Diagonal", 200, 200, fontSize: 24, rotation: 45);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "rotation_text_45");
-            var bitmap = TestHelper.RasterizePage(bytes, "rotation_text_45");
+            TestHelper.SavePdf(bytes, "Graphics/rotation-text-45deg");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rotation-text-45deg");
 
             // With 45° CW rotation, text should go down-right diagonally
             // Check for non-white pixels in the diagonal region
@@ -89,12 +91,13 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: rectangle rotated 45 degrees");
             // Draw a 100x100 filled rectangle at (200, 200) rotated 45°
             page.DrawFilledRectangle(200, 200, 100, 100, PdfColor.Red, rotation: 45);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "rotation_rect_45");
-            var bitmap = TestHelper.RasterizePage(bytes, "rotation_rect_45");
+            TestHelper.SavePdf(bytes, "Graphics/rotation-rect-45deg");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rotation-rect-45deg");
 
             // The rotated rectangle should form a diamond shape
             // Check that there are red pixels at the anchor point
@@ -129,11 +132,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: rectangle outline rotated 45 degrees");
             page.DrawRectangle(200, 200, 100, 100, PdfColor.Black, 2, rotation: 45);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "rotation_rect_outline_45");
-            var bitmap = TestHelper.RasterizePage(bytes, "rotation_rect_outline_45");
+            TestHelper.SavePdf(bytes, "Graphics/rotation-rect-outline-45deg");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rotation-rect-outline-45deg");
 
             // Rotated rectangle outline should have dark pixels in rotated positions
             // The original top-left corner (200,200) is the rotation origin
@@ -164,12 +168,13 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: line rotated 90 degrees");
             // Horizontal line from (100,200) to (300,200), rotated 90° around (100,200)
             page.DrawLine(100, 200, 300, 200, PdfColor.Black, 2, rotation: 90);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "rotation_line_90");
-            var bitmap = TestHelper.RasterizePage(bytes, "rotation_line_90");
+            TestHelper.SavePdf(bytes, "Graphics/rotation-line-90deg");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rotation-line-90deg");
 
             // After 90° CW rotation around start point, line should go downward from (100,200)
             int lineX = (int)(100 * 150 / 72.0);
@@ -201,13 +206,14 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: image rotated 90 degrees");
             var imgBytes = TestHelper.CreateQuadrantJpeg(100, 100);
             var image = PdfImage.FromBytes(imgBytes);
             page.DrawImage(image, 200, 200, 100, 100, rotation: 90);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "rotation_image_90");
-            var bitmap = TestHelper.RasterizePage(bytes, "rotation_image_90");
+            TestHelper.SavePdf(bytes, "Graphics/rotation-image-90deg");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rotation-image-90deg");
 
             // Image should be rotated 90° CW around (200,200)
             // Search broadly for any non-white content in the region around the anchor
@@ -240,12 +246,13 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: textbox rotated 90 degrees");
             page.DrawText("This is a wrapped text box that should be rotated.",
                 200, 100, fontSize: 12, rotation: 90, width: 150);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "rotation_textbox_90");
-            var bitmap = TestHelper.RasterizePage(bytes, "rotation_textbox_90");
+            TestHelper.SavePdf(bytes, "Graphics/rotation-textbox-90deg");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rotation-textbox-90deg");
 
             // Text should extend downward from (200,100) when rotated 90° CW
             int ax = (int)(200 * 150 / 72.0);
@@ -280,6 +287,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: rich text rotated 90 degrees");
             var spans = new[]
             {
                 new TextSpan("Bold ", PdfFont.HelveticaBold, 14),
@@ -288,8 +296,8 @@ namespace SimpleTinyPDF.Tests
             page.DrawText(spans, 200, 200, rotation: 90);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "rotation_richtext_90");
-            var bitmap = TestHelper.RasterizePage(bytes, "rotation_richtext_90");
+            TestHelper.SavePdf(bytes, "Graphics/rotation-richtext-90deg");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rotation-richtext-90deg");
 
             // Verify content exists below the anchor point (rotated 90° CW)
             int ax = (int)(200 * 150 / 72.0);
@@ -324,12 +332,13 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: rotated text in BottomUp coordinate system");
             page.CoordinateOrigin = CoordinateOrigin.BottomUp;
             page.DrawText("BottomUp Rotated", 200, 500, fontSize: 16, rotation: 90);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "rotation_text_bottomup_90");
-            var bitmap = TestHelper.RasterizePage(bytes, "rotation_text_bottomup_90");
+            TestHelper.SavePdf(bytes, "Graphics/rotation-text-bottomup-90deg");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rotation-text-bottomup-90deg");
 
             // In BottomUp, Y=500 from bottom. The text should be rendered somewhere on the page.
             // Search the full page for dark pixels.
@@ -355,6 +364,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: multiple elements at different rotation angles");
 
             // Multiple rotated elements should not interfere with each other
             page.DrawText("Text at 0°", 100, 100, fontSize: 14);
@@ -365,8 +375,8 @@ namespace SimpleTinyPDF.Tests
             page.DrawRectangle(300, 300, 80, 80, PdfColor.Green, 2, rotation: 60);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "rotation_multiple_elements");
-            var bitmap = TestHelper.RasterizePage(bytes, "rotation_multiple_elements");
+            TestHelper.SavePdf(bytes, "Graphics/rotation-multiple-elements");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rotation-multiple-elements");
 
             // Verify the non-rotated text at (100,100) is still horizontal
             // Search a vertical band around the expected Y position

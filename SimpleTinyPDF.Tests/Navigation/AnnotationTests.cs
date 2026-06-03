@@ -1,13 +1,9 @@
-using System.Text;
 using Xunit;
 
 namespace SimpleTinyPDF.Tests
 {
     public class AnnotationTests
     {
-        private static string GetPdfText(byte[] bytes) =>
-            Encoding.ASCII.GetString(bytes);
-
         // ── Text annotations (sticky notes) ────────────────────
 
         [Fact]
@@ -16,7 +12,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddTextAnnotation(100, 100, "This is a note");
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
             Assert.Contains("/Subtype /Text", pdf);
@@ -31,7 +27,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddTextAnnotation(100, 100, "Note text", title: "Author");
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/T", pdf);
         }
@@ -42,7 +38,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddTextAnnotation(100, 100, "Note", icon: TextAnnotationIcon.Note);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Name /Note", pdf);
         }
@@ -53,7 +49,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddTextAnnotation(100, 100, "Note", color: PdfColor.Red);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/C [1 0 0]", pdf);
         }
@@ -64,7 +60,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddTextAnnotation(100, 100, "Note", open: true);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Open true", pdf);
         }
@@ -75,7 +71,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddTextAnnotation(100, 100, "Note");
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Open false", pdf);
         }
@@ -87,7 +83,7 @@ namespace SimpleTinyPDF.Tests
             var page = doc.AddPage(PageSize.A4);
             page.CoordinateOrigin = CoordinateOrigin.BottomUp;
             page.AddTextAnnotation(100, 700, "Note");
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Subtype /Text", pdf);
         }
@@ -97,11 +93,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: text annotation (sticky note) appears on page");
             page.AddTextAnnotation(50, 50, "Sticky note content", title: "Reviewer");
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "annot_text");
-            var bitmap = TestHelper.RasterizePage(bytes, "annot_text");
+            TestHelper.SavePdf(bytes, "Navigation/annotation-text-note");
+            var bitmap = TestHelper.RasterizePage(bytes, "Navigation/annotation-text-note");
             Assert.True(bitmap.Width > 0);
             bitmap.Dispose();
         }
@@ -114,7 +111,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddMarkupAnnotation(50, 50, 200, 14, MarkupAnnotationType.Highlight);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
             Assert.Contains("/Subtype /Highlight", pdf);
@@ -126,7 +123,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddMarkupAnnotation(50, 50, 200, 14, MarkupAnnotationType.Underline);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Subtype /Underline", pdf);
         }
@@ -137,7 +134,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddMarkupAnnotation(50, 50, 200, 14, MarkupAnnotationType.StrikeOut);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Subtype /StrikeOut", pdf);
         }
@@ -148,7 +145,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddMarkupAnnotation(50, 50, 200, 14);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/QuadPoints", pdf);
         }
@@ -159,7 +156,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddMarkupAnnotation(50, 50, 200, 14, color: PdfColor.Blue);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/C [0 0 1]", pdf);
         }
@@ -170,7 +167,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddMarkupAnnotation(50, 50, 200, 14, contents: "Review comment");
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Contents", pdf);
         }
@@ -182,7 +179,7 @@ namespace SimpleTinyPDF.Tests
             var page = doc.AddPage(PageSize.A4);
             page.CoordinateOrigin = CoordinateOrigin.BottomUp;
             page.AddMarkupAnnotation(50, 700, 200, 14);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Subtype /Highlight", pdf);
         }
@@ -192,13 +189,14 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: highlight markup annotation renders");
             page.DrawText("Highlighted text here", 50, 50);
             page.AddMarkupAnnotation(50, 50, 150, 14, MarkupAnnotationType.Highlight,
                 color: PdfColor.Rgb(1f, 1f, 0f));
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "annot_highlight");
-            var bitmap = TestHelper.RasterizePage(bytes, "annot_highlight");
+            TestHelper.SavePdf(bytes, "Navigation/annotation-highlight-markup");
+            var bitmap = TestHelper.RasterizePage(bytes, "Navigation/annotation-highlight-markup");
             Assert.True(bitmap.Width > 0);
             bitmap.Dispose();
         }
@@ -211,7 +209,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddStampAnnotation(100, 100, 200, 60);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
             Assert.Contains("/Subtype /Stamp", pdf);
@@ -232,7 +230,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddStampAnnotation(100, 100, 200, 60, stamp: stamp);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains($"/Name /{expectedName}", pdf);
         }
@@ -243,7 +241,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddStampAnnotation(100, 100, 200, 60, contents: "Tooltip text");
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Contents", pdf);
         }
@@ -254,7 +252,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.AddStampAnnotation(100, 100, 200, 60, color: PdfColor.Red);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/C [1 0 0]", pdf);
         }
@@ -266,7 +264,7 @@ namespace SimpleTinyPDF.Tests
             var page = doc.AddPage(PageSize.A4);
             page.CoordinateOrigin = CoordinateOrigin.BottomUp;
             page.AddStampAnnotation(100, 700, 200, 60, stamp: StampType.Approved);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Subtype /Stamp", pdf);
         }
@@ -276,11 +274,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: stamp annotation appears on page");
             page.AddStampAnnotation(50, 50, 200, 60, stamp: StampType.Approved);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "annot_stamp");
-            var bitmap = TestHelper.RasterizePage(bytes, "annot_stamp");
+            TestHelper.SavePdf(bytes, "Navigation/annotation-stamp");
+            var bitmap = TestHelper.RasterizePage(bytes, "Navigation/annotation-stamp");
             Assert.True(bitmap.Width > 0);
             bitmap.Dispose();
         }
@@ -294,7 +293,7 @@ namespace SimpleTinyPDF.Tests
             var page1 = doc.AddPage(PageSize.A4);
             var page2 = doc.AddPage(PageSize.A4);
             page1.AddLinkToPage(50, 50, 100, 20, page2);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
             Assert.Contains("/Subtype /Link", pdf);
@@ -309,7 +308,7 @@ namespace SimpleTinyPDF.Tests
             var page1 = doc.AddPage(PageSize.A4);
             var page2 = doc.AddPage(PageSize.A4);
             page1.AddLinkToPage(50, 50, 100, 20, page2);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Fit", pdf);
         }
@@ -321,7 +320,7 @@ namespace SimpleTinyPDF.Tests
             var page1 = doc.AddPage(PageSize.A4);
             var page2 = doc.AddPage(PageSize.A4);
             page1.AddLinkToPage(50, 50, 100, 20, page2, targetY: 200);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/XYZ", pdf);
         }
@@ -344,7 +343,7 @@ namespace SimpleTinyPDF.Tests
             var page2 = doc.AddPage(PageSize.A4);
             page1.CoordinateOrigin = CoordinateOrigin.BottomUp;
             page1.AddLinkToPage(50, 700, 100, 20, page2);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Dest", pdf);
         }
@@ -355,13 +354,14 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page1 = doc.AddPage(PageSize.A4);
             var page2 = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page1, "Verify: internal page link annotation works");
             page1.DrawText("Go to page 2", 50, 50);
             page1.AddLinkToPage(50, 50, 120, 14, page2);
             page2.DrawText("Page 2 content", 50, 50);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "annot_internal_link");
-            var bitmap = TestHelper.RasterizePage(bytes, "annot_internal_link");
+            TestHelper.SavePdf(bytes, "Navigation/annotation-internal-link");
+            var bitmap = TestHelper.RasterizePage(bytes, "Navigation/annotation-internal-link");
             Assert.True(bitmap.Width > 0);
             bitmap.Dispose();
         }
@@ -374,7 +374,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.DrawText("Click here", 50, 50, link: "https://example.com");
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
             Assert.Contains("/Subtype /Link", pdf);
@@ -398,7 +398,7 @@ namespace SimpleTinyPDF.Tests
             page1.AddStampAnnotation(50, 140, 200, 60, stamp: StampType.Approved);
             page1.AddLinkToPage(50, 220, 100, 20, page2);
 
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/URI", pdf);
             Assert.Contains("/Subtype /Text", pdf);
@@ -414,6 +414,7 @@ namespace SimpleTinyPDF.Tests
             var page1 = doc.AddPage(PageSize.A4);
             var page2 = doc.AddPage(PageSize.A4);
 
+            TestHelper.AddDescription(page1, "Verify: all annotation types on single page");
             page1.DrawText("Some text to annotate", 50, 50);
             page1.DrawText("Click for link", 50, 80, link: "https://example.com");
             page1.AddTextAnnotation(300, 50, "Review note", title: "Reviewer",
@@ -430,8 +431,8 @@ namespace SimpleTinyPDF.Tests
             page2.DrawText("Target page", 50, 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "annot_all_types");
-            var bitmap = TestHelper.RasterizePage(bytes, "annot_all_types");
+            TestHelper.SavePdf(bytes, "Navigation/annotations-all-types");
+            var bitmap = TestHelper.RasterizePage(bytes, "Navigation/annotations-all-types");
             Assert.True(bitmap.Width > 0);
             bitmap.Dispose();
         }
@@ -445,7 +446,7 @@ namespace SimpleTinyPDF.Tests
             var page = doc.AddPage(PageSize.A4);
             // Pure cyan in CMYK = (1, 0, 0, 0) → RGB (0, 1, 1)
             page.AddTextAnnotation(100, 100, "Note", color: PdfColor.Cyan);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/C [0 1 1]", pdf);
         }
@@ -458,7 +459,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.DrawText("Plain text", 50, 50);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.DoesNotContain("/Annots", pdf);
         }

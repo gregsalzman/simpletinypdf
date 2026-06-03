@@ -6,39 +6,6 @@ namespace SimpleTinyPDF.Tests
 {
     public class TextStyleTests
     {
-        private static int PtToPx(float pt, int dpi = 150) => (int)(pt * dpi / 72.0);
-
-        private static bool HasDarkPixelsInRegion(SkiaSharp.SKBitmap bitmap,
-            int xMin, int xMax, int yMin, int yMax)
-        {
-            xMax = System.Math.Min(xMax, bitmap.Width - 1);
-            yMax = System.Math.Min(yMax, bitmap.Height - 1);
-            for (int x = xMin; x <= xMax; x++)
-                for (int y = yMin; y <= yMax; y++)
-                {
-                    var p = bitmap.GetPixel(x, y);
-                    if (p.Red < 200 || p.Green < 200 || p.Blue < 200)
-                        return true;
-                }
-            return false;
-        }
-
-        private static int CountDarkPixelsInRegion(SkiaSharp.SKBitmap bitmap,
-            int xMin, int xMax, int yMin, int yMax)
-        {
-            xMax = System.Math.Min(xMax, bitmap.Width - 1);
-            yMax = System.Math.Min(yMax, bitmap.Height - 1);
-            int count = 0;
-            for (int x = xMin; x <= xMax; x++)
-                for (int y = yMin; y <= yMax; y++)
-                {
-                    var p = bitmap.GetPixel(x, y);
-                    if (p.Red < 200 || p.Green < 200 || p.Blue < 200)
-                        count++;
-                }
-            return count;
-        }
-
         // ── TextSpan property tests ──────────────────────────────────
 
         [Fact]
@@ -151,22 +118,23 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: character spacing makes text wider than default");
             page.DrawText("HELLO", 50, 50, PdfFont.Helvetica, 24);
             page.DrawText("HELLO", 50, 90, PdfFont.Helvetica, 24, characterSpacing: 5f);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "char_spacing_wider");
-            var bitmap = TestHelper.RasterizePage(bytes, "char_spacing_wider");
+            TestHelper.SavePdf(bytes, "Text/char-spacing-wider-builtin");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/char-spacing-wider-builtin");
 
             // Spaced text should extend further right
             int normalRight = 0;
             int spacedRight = 0;
-            int yNormal = PtToPx(50);
-            int ySpaced = PtToPx(90);
+            int yNormal = TestHelper.PtToPx(50);
+            int ySpaced = TestHelper.PtToPx(90);
             for (int px = bitmap.Width - 1; px >= 0; px--)
             {
-                if (normalRight == 0 && HasDarkPixelsInRegion(bitmap, px, px, yNormal, yNormal + PtToPx(24)))
+                if (normalRight == 0 && TestHelper.HasDarkPixelsInRegion(bitmap, px, px, yNormal, yNormal + TestHelper.PtToPx(24)))
                     normalRight = px;
-                if (spacedRight == 0 && HasDarkPixelsInRegion(bitmap, px, px, ySpaced, ySpaced + PtToPx(24)))
+                if (spacedRight == 0 && TestHelper.HasDarkPixelsInRegion(bitmap, px, px, ySpaced, ySpaced + TestHelper.PtToPx(24)))
                     spacedRight = px;
                 if (normalRight > 0 && spacedRight > 0) break;
             }
@@ -216,16 +184,17 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: faux bold text appears thicker via fill+stroke rendering");
             page.DrawText("Hello World", 50, 50, PdfFont.Helvetica, 24);
             page.DrawText("Hello World", 50, 90, PdfFont.Helvetica, 24, bold: true);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "faux_bold_thicker");
-            var bitmap = TestHelper.RasterizePage(bytes, "faux_bold_thicker");
+            TestHelper.SavePdf(bytes, "Text/faux-bold-thicker-stroke");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/faux-bold-thicker-stroke");
 
-            int normalDark = CountDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(250), PtToPx(50), PtToPx(50) + PtToPx(24));
-            int boldDark = CountDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(250), PtToPx(90), PtToPx(90) + PtToPx(24));
+            int normalDark = TestHelper.CountDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(250), TestHelper.PtToPx(50), TestHelper.PtToPx(50) + TestHelper.PtToPx(24));
+            int boldDark = TestHelper.CountDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(250), TestHelper.PtToPx(90), TestHelper.PtToPx(90) + TestHelper.PtToPx(24));
             Assert.True(boldDark > normalDark,
                 $"Faux bold ({boldDark} dark px) should be thicker than normal ({normalDark})");
             bitmap.Dispose();
@@ -261,12 +230,13 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: faux italic text has 12-degree shear");
             page.DrawText("Italic Text", 50, 50, PdfFont.Helvetica, 36, italic: true);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "faux_italic");
-            var bitmap = TestHelper.RasterizePage(bytes, "faux_italic");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(350), PtToPx(50), PtToPx(50) + PtToPx(36)));
+            TestHelper.SavePdf(bytes, "Text/faux-italic-12deg-shear");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/faux-italic-12deg-shear");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(350), TestHelper.PtToPx(50), TestHelper.PtToPx(50) + TestHelper.PtToPx(36)));
             bitmap.Dispose();
         }
 
@@ -277,13 +247,14 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: faux bold and italic applied together");
             page.DrawText("Bold Italic", 50, 50, PdfFont.Helvetica, 24,
                 bold: true, italic: true);
             var stream = page.GetContentStream();
             Assert.Contains("2 Tr", stream);
             Assert.Contains("0.2126", stream);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "faux_bold_italic");
+            TestHelper.SavePdf(bytes, "Text/faux-bold-and-italic-combined");
         }
 
         // ── Justification content stream tests ───────────────────────
@@ -333,16 +304,17 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: justified text fills full textbox width");
             string longText = "This is a longer paragraph of text that should be fully justified. " +
                 "Each line except the last should stretch to fill the entire available width, " +
                 "creating clean left and right edges for a professional typeset appearance.";
             page.DrawText(longText, 50, 50, PdfFont.Helvetica, 12,
                 alignment: TextAlignment.Justify, width: 400);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "justify_full_width");
-            var bitmap = TestHelper.RasterizePage(bytes, "justify_full_width");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(450), PtToPx(50), PtToPx(50) + PtToPx(60)));
+            TestHelper.SavePdf(bytes, "Text/justify-full-width-textbox");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/justify-full-width-textbox");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(450), TestHelper.PtToPx(50), TestHelper.PtToPx(50) + TestHelper.PtToPx(60)));
             bitmap.Dispose();
         }
 
@@ -351,6 +323,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: justified rich text spans fill textbox width");
             page.DrawText(new[]
             {
                 new TextSpan("This is "),
@@ -358,10 +331,10 @@ namespace SimpleTinyPDF.Tests
                 new TextSpan("rich text that wraps across multiple lines to test the justification algorithm.")
             }, 50, 50, alignment: TextAlignment.Justify, width: 350);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_justify");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtext_justify");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(50), PtToPx(50) + PtToPx(40)));
+            TestHelper.SavePdf(bytes, "Text/richtext-justified-spans");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtext-justified-spans");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(50), TestHelper.PtToPx(50) + TestHelper.PtToPx(40)));
             bitmap.Dispose();
         }
 
@@ -373,14 +346,15 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(Path.Combine("TestAssets", "Roboto-Regular.ttf"));
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: faux bold works with custom TrueType font");
             page.DrawText("Custom font bold", 50, 50, font, 24, bold: true);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "custom_faux_bold");
+            TestHelper.SavePdf(bytes, "Text/custom-font-faux-bold");
             var stream = page.GetContentStream();
             Assert.Contains("2 Tr", stream);
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_faux_bold");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(350), PtToPx(50), PtToPx(50) + PtToPx(24)));
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/custom-font-faux-bold");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(350), TestHelper.PtToPx(50), TestHelper.PtToPx(50) + TestHelper.PtToPx(24)));
             bitmap.Dispose();
         }
 
@@ -390,14 +364,15 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(Path.Combine("TestAssets", "Roboto-Regular.ttf"));
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: faux italic works with custom TrueType font");
             page.DrawText("Custom font italic", 50, 50, font, 24, italic: true);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "custom_faux_italic");
+            TestHelper.SavePdf(bytes, "Text/custom-font-faux-italic");
             var stream = page.GetContentStream();
             Assert.Contains("0.2126", stream);
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_faux_italic");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(50), PtToPx(50) + PtToPx(24)));
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/custom-font-faux-italic");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(50), TestHelper.PtToPx(50) + TestHelper.PtToPx(24)));
             bitmap.Dispose();
         }
 
@@ -407,9 +382,10 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(Path.Combine("TestAssets", "Roboto-Regular.ttf"));
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: character spacing works with custom TrueType font");
             page.DrawText("Spaced", 50, 50, font, 24, characterSpacing: 3f);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "custom_char_spacing");
+            TestHelper.SavePdf(bytes, "Text/custom-font-char-spacing");
             var stream = page.GetContentStream();
             Assert.Contains("3 Tc", stream);
         }
@@ -421,13 +397,14 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: faux bold text wraps correctly in textbox");
             float endY = page.DrawText("This bold text wraps across multiple lines for testing.",
                 50, 50, bold: true, width: 150);
             Assert.True(endY > 50);
             var stream = page.GetContentStream();
             Assert.Contains("2 Tr", stream);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "bold_wrapped");
+            TestHelper.SavePdf(bytes, "Text/faux-bold-wrapped-textbox");
         }
 
         [Fact]
@@ -435,13 +412,14 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: faux italic text wraps correctly in textbox");
             float endY = page.DrawText("This italic text wraps across multiple lines for testing.",
                 50, 50, italic: true, width: 150);
             Assert.True(endY > 50);
             var stream = page.GetContentStream();
             Assert.Contains("0.2126", stream);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "italic_wrapped");
+            TestHelper.SavePdf(bytes, "Text/faux-italic-wrapped-textbox");
         }
 
         // ── Rich text with mixed styles ──────────────────────────────
@@ -451,6 +429,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: mix of bold and normal spans inline");
             page.DrawText(new[]
             {
                 new TextSpan("Normal "),
@@ -461,7 +440,7 @@ namespace SimpleTinyPDF.Tests
             Assert.Contains("2 Tr", stream);
             Assert.Contains("0 Tr", stream);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_mixed_bold");
+            TestHelper.SavePdf(bytes, "Text/richtext-mixed-bold-spans");
         }
 
         [Fact]
@@ -469,6 +448,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: mix of italic and normal spans inline");
             page.DrawText(new[]
             {
                 new TextSpan("Normal "),
@@ -478,7 +458,7 @@ namespace SimpleTinyPDF.Tests
             var stream = page.GetContentStream();
             Assert.Contains("0.2126", stream);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_mixed_italic");
+            TestHelper.SavePdf(bytes, "Text/richtext-mixed-italic-spans");
         }
 
         [Fact]
@@ -486,6 +466,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: mixed bold/italic rich text wraps in textbox");
             page.DrawText(new[]
             {
                 new TextSpan("Normal text "),
@@ -495,10 +476,10 @@ namespace SimpleTinyPDF.Tests
                 new TextSpan("and back to normal.")
             }, 50, 50, width: 300);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_wrapped_mixed");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtext_wrapped_mixed");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(350), PtToPx(50), PtToPx(50) + PtToPx(40)));
+            TestHelper.SavePdf(bytes, "Text/richtext-wrapped-mixed-styles");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/richtext-wrapped-mixed-styles");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(350), TestHelper.PtToPx(50), TestHelper.PtToPx(50) + TestHelper.PtToPx(40)));
             bitmap.Dispose();
         }
 
@@ -509,6 +490,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: bold, italic, spacing, and justification all combined");
             page.DrawText("Bold Italic Spaced", 50, 50, PdfFont.Helvetica, 24,
                 bold: true, italic: true, characterSpacing: 1.5f);
             var stream = page.GetContentStream();
@@ -516,7 +498,7 @@ namespace SimpleTinyPDF.Tests
             Assert.Contains("0.2126", stream);    // italic
             Assert.Contains("1.5 Tc", stream); // character spacing
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "all_combined");
+            TestHelper.SavePdf(bytes, "Text/all-styles-combined-showcase");
         }
 
         [Fact]
@@ -524,16 +506,17 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: justified text with bold and italic formatting");
             page.DrawText(
                 "This text is bold, italic, and justified. It wraps across lines to demonstrate all features working together.",
                 50, 50, PdfFont.Helvetica, 14,
                 alignment: TextAlignment.Justify, width: 350,
                 bold: true, italic: true);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "justified_bold_italic");
-            var bitmap = TestHelper.RasterizePage(bytes, "justified_bold_italic");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(50), PtToPx(50) + PtToPx(50)));
+            TestHelper.SavePdf(bytes, "Text/justified-bold-italic-combined");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/justified-bold-italic-combined");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(50), TestHelper.PtToPx(50) + TestHelper.PtToPx(50)));
             bitmap.Dispose();
         }
 
@@ -544,6 +527,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: full showcase of all text styling features");
             float y = 50;
 
             // Header
@@ -601,10 +585,10 @@ namespace SimpleTinyPDF.Tests
             }, 50, y);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "showcase_all_features");
-            var bitmap = TestHelper.RasterizePage(bytes, "showcase_all_features");
+            TestHelper.SavePdf(bytes, "Text/text-styles-full-showcase");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/text-styles-full-showcase");
             // Verify page has content throughout
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(450), PtToPx(50), PtToPx(200)));
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(450), TestHelper.PtToPx(50), TestHelper.PtToPx(200)));
             bitmap.Dispose();
         }
     }

@@ -20,10 +20,11 @@ namespace SimpleTinyPDF.Tests
                 Level = PdfEncryptionLevel.Aes128
             };
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: AES-128 encrypted PDF with user password");
             page.DrawText("Hello Encrypted World", 50, 50, PdfFont.Helvetica, 24);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "encrypted_aes128");
+            TestHelper.SavePdf(bytes, "Document/encrypted-aes128-user-password");
 
             // Verify PDF header is 1.6
             var header = Encoding.ASCII.GetString(bytes, 0, 10);
@@ -49,13 +50,14 @@ namespace SimpleTinyPDF.Tests
                 Permissions = PdfPermissions.Print
             };
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: AES-128 encrypted PDF opens without password when only owner password set");
             page.DrawText("Owner-only restriction", 50, 50, PdfFont.Helvetica, 18);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "encrypted_aes128_owner_only");
+            TestHelper.SavePdf(bytes, "Document/encrypted-aes128-owner-only");
 
             // Should open without password (empty user password)
-            var bitmap = TestHelper.RasterizePage(bytes, "encrypted_aes128_owner_only");
+            var bitmap = TestHelper.RasterizePage(bytes, "Document/encrypted-aes128-owner-only");
             Assert.True(bitmap.Width > 100);
             bitmap.Dispose();
         }
@@ -71,11 +73,12 @@ namespace SimpleTinyPDF.Tests
                 Level = PdfEncryptionLevel.Aes128
             };
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: AES-128 encrypted PDF renders text content correctly");
             page.DrawText("Test content", 100, 100, PdfFont.Helvetica, 24);
             page.DrawFilledRectangle(50, 200, 200, 100, PdfColor.Red);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "encrypted_aes128_with_content");
+            TestHelper.SavePdf(bytes, "Document/encrypted-aes128-with-content");
 
             // Rasterize with the user password
             var bitmap = PDFtoImage.Conversion.ToImage(bytes, page: 0, password: "secret",
@@ -106,10 +109,11 @@ namespace SimpleTinyPDF.Tests
                 Level = PdfEncryptionLevel.Aes256
             };
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: AES-256 encrypted PDF with user password");
             page.DrawText("AES-256 Encrypted", 50, 50, PdfFont.Helvetica, 24);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "encrypted_aes256");
+            TestHelper.SavePdf(bytes, "Document/encrypted-aes256-user-password");
 
             // Verify PDF header is 2.0
             var header = Encoding.ASCII.GetString(bytes, 0, 10);
@@ -138,13 +142,14 @@ namespace SimpleTinyPDF.Tests
                 Permissions = PdfPermissions.Print | PdfPermissions.ExtractText
             };
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: AES-256 encrypted PDF opens without password when only owner password set");
             page.DrawText("AES-256 owner-only", 50, 50, PdfFont.Helvetica, 18);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "encrypted_aes256_owner_only");
+            TestHelper.SavePdf(bytes, "Document/encrypted-aes256-owner-only");
 
             // Should open without password
-            var bitmap = TestHelper.RasterizePage(bytes, "encrypted_aes256_owner_only");
+            var bitmap = TestHelper.RasterizePage(bytes, "Document/encrypted-aes256-owner-only");
             Assert.True(bitmap.Width > 100);
             bitmap.Dispose();
         }
@@ -160,10 +165,11 @@ namespace SimpleTinyPDF.Tests
                 Level = PdfEncryptionLevel.Aes256
             };
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: AES-256 encrypted PDF renders text content correctly");
             page.DrawFilledRectangle(50, 50, 200, 100, PdfColor.Blue);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "encrypted_aes256_with_content");
+            TestHelper.SavePdf(bytes, "Document/encrypted-aes256-with-content");
 
             var bitmap = PDFtoImage.Conversion.ToImage(bytes, page: 0, password: "secret256",
                 options: new PDFtoImage.RenderOptions(Dpi: 150));
@@ -309,12 +315,14 @@ namespace SimpleTinyPDF.Tests
                 OwnerPassword = "multi",
                 Level = PdfEncryptionLevel.Aes128
             };
-            doc.AddPage(PageSize.A4).DrawText("Page 1", 50, 50, PdfFont.Helvetica, 18);
+            var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: AES-128 encrypted multi-page PDF has all pages accessible");
+            page.DrawText("Page 1", 50, 50, PdfFont.Helvetica, 18);
             doc.AddPage(PageSize.A4).DrawText("Page 2", 50, 50, PdfFont.Helvetica, 18);
             doc.AddPage(PageSize.A4).DrawText("Page 3", 50, 50, PdfFont.Helvetica, 18);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "encrypted_multipage");
+            TestHelper.SavePdf(bytes, "Document/encrypted-multipage");
 
             // Should have 3 pages accessible with the password
             var count = PDFtoImage.Conversion.GetPageCount(bytes, password: "multi");
@@ -334,12 +342,13 @@ namespace SimpleTinyPDF.Tests
                 Level = PdfEncryptionLevel.Aes128
             };
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: AES-128 encrypted PDF with embedded image renders correctly");
             var jpeg = TestHelper.CreateTestJpeg();
             var img = doc.AddImage(PdfImage.FromBytes(jpeg));
             page.DrawImage(img, 50, 50, 100, 100);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "encrypted_with_image");
+            TestHelper.SavePdf(bytes, "Document/encrypted-with-image");
 
             var bitmap = PDFtoImage.Conversion.ToImage(bytes, page: 0, password: "imgtest",
                 options: new PDFtoImage.RenderOptions(Dpi: 150));

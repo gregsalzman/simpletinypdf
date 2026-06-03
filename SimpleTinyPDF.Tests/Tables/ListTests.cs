@@ -4,22 +4,6 @@ namespace SimpleTinyPDF.Tests
 {
     public class ListTests
     {
-        private static int PtToPx(float pt) => (int)(pt * 150 / 72.0);
-
-        private static bool HasDarkPixelsInRegion(SkiaSharp.SKBitmap bitmap,
-            int xMin, int xMax, int yMin, int yMax)
-        {
-            xMax = System.Math.Min(xMax, bitmap.Width - 1);
-            yMax = System.Math.Min(yMax, bitmap.Height - 1);
-            for (int x = System.Math.Max(0, xMin); x <= xMax; x++)
-                for (int y = System.Math.Max(0, yMin); y <= yMax; y++)
-                {
-                    var p = bitmap.GetPixel(x, y);
-                    if (p.Red < 200 || p.Green < 200 || p.Blue < 200) return true;
-                }
-            return false;
-        }
-
         // ── Flat bullet list ───────────────────────────────────────
 
         [Fact]
@@ -27,6 +11,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: basic bullet list with round markers");
             var items = new[]
             {
                 new ListItem("First item"),
@@ -37,13 +22,13 @@ namespace SimpleTinyPDF.Tests
 
             Assert.True(endY > 50);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "list_bullet");
-            var bitmap = TestHelper.RasterizePage(bytes, "list_bullet");
+            TestHelper.SavePdf(bytes, "Tables/bullet-list-basic");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/bullet-list-basic");
             float itemSpacing = 12 * 1.2f + 12 * 0.3f;
             for (int i = 0; i < items.Length; i++)
             {
                 float itemY = 50 + i * itemSpacing;
-                Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), PtToPx(itemY), PtToPx(itemY + 14)),
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), TestHelper.PtToPx(itemY), TestHelper.PtToPx(itemY + 14)),
                     $"Expected visible text for bullet item {i + 1} at Y~{itemY}");
             }
             bitmap.Dispose();
@@ -54,6 +39,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: numbered list with sequential numbers");
             var items = new[]
             {
                 new ListItem("First item"),
@@ -64,15 +50,15 @@ namespace SimpleTinyPDF.Tests
 
             Assert.True(endY > 50);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "list_numbered");
-            var bitmap = TestHelper.RasterizePage(bytes, "list_numbered");
+            TestHelper.SavePdf(bytes, "Tables/numbered-list-basic");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/numbered-list-basic");
             float itemSpacing = 12 * 1.2f + 12 * 0.3f;
             for (int i = 0; i < items.Length; i++)
             {
                 float itemY = 50 + i * itemSpacing;
-                Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(60), PtToPx(itemY), PtToPx(itemY + 14)),
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(60), TestHelper.PtToPx(itemY), TestHelper.PtToPx(itemY + 14)),
                     $"Expected number marker for item {i + 1} at X=50, Y~{itemY}");
-                Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(70), PtToPx(300), PtToPx(itemY), PtToPx(itemY + 14)),
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(70), TestHelper.PtToPx(300), TestHelper.PtToPx(itemY), TestHelper.PtToPx(itemY + 14)),
                     $"Expected text for item {i + 1} at X=70, Y~{itemY}");
             }
             bitmap.Dispose();
@@ -83,6 +69,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: long bullet list items wrap correctly");
             var items = new[]
             {
                 new ListItem("This is a very long list item that should wrap to multiple lines when rendered in a narrow column width"),
@@ -93,17 +80,17 @@ namespace SimpleTinyPDF.Tests
 
             Assert.True(endY > 100, "Long items should take more vertical space");
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "list_bullet_wrap");
-            var bitmap = TestHelper.RasterizePage(bytes, "list_bullet_wrap");
+            TestHelper.SavePdf(bytes, "Tables/bullet-list-word-wrapped");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/bullet-list-word-wrapped");
 
             float lineHeight = 12 * 1.2f;
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(65), PtToPx(350), PtToPx(50), PtToPx(50 + 12)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(65), TestHelper.PtToPx(350), TestHelper.PtToPx(50), TestHelper.PtToPx(50 + 12)),
                 "Expected text on line 1 of first (long) bullet item");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(65), PtToPx(350), PtToPx(50 + lineHeight), PtToPx(50 + lineHeight + 12)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(65), TestHelper.PtToPx(350), TestHelper.PtToPx(50 + lineHeight), TestHelper.PtToPx(50 + lineHeight + 12)),
                 "Expected wrapped text on line 2 of first (long) bullet item");
 
             float lastItemApproxY = endY - 12 * 1.2f - 12 * 0.3f;
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(350), PtToPx(lastItemApproxY - 20), PtToPx(endY)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(350), TestHelper.PtToPx(lastItemApproxY - 20), TestHelper.PtToPx(endY)),
                 "Expected visible text for the last bullet item");
             bitmap.Dispose();
         }
@@ -113,6 +100,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: numbered list starts at specified number");
             var items = new[]
             {
                 new ListItem("Item A"),
@@ -122,13 +110,13 @@ namespace SimpleTinyPDF.Tests
             var (_, _) = page.DrawList(items, 50, 50, 400, style: ListStyle.Numbered, startNumber: 5);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "list_numbered_start5");
-            var bitmap = TestHelper.RasterizePage(bytes, "list_numbered_start5");
+            TestHelper.SavePdf(bytes, "Tables/numbered-list-start-at-5");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/numbered-list-start-at-5");
             float itemSpacing = 12 * 1.2f + 12 * 0.3f;
             for (int i = 0; i < items.Length; i++)
             {
                 float itemY = 50 + i * itemSpacing;
-                Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), PtToPx(itemY), PtToPx(itemY + 14)),
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), TestHelper.PtToPx(itemY), TestHelper.PtToPx(itemY + 14)),
                     $"Expected visible text for numbered item {5 + i} at Y~{itemY}");
             }
             bitmap.Dispose();
@@ -139,6 +127,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: bullet list renders in red color");
             var items = new[]
             {
                 new ListItem("Red item one"),
@@ -147,8 +136,8 @@ namespace SimpleTinyPDF.Tests
             page.DrawList(items, 50, 50, 400, color: PdfColor.Red);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "list_bullet_red");
-            var bitmap = TestHelper.RasterizePage(bytes, "list_bullet_red");
+            TestHelper.SavePdf(bytes, "Tables/bullet-list-red-color");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/bullet-list-red-color");
 
             bool foundRed = false;
             for (int x = 80; x < 400 && !foundRed; x++)
@@ -167,6 +156,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: bullet and numbered lists on same page");
             float y = 50;
             page.DrawText("Bullet List:", 50, y, PdfFont.HelveticaBold, 14);
             y += 20;
@@ -190,13 +180,13 @@ namespace SimpleTinyPDF.Tests
             }, 50, y, 400, style: ListStyle.Numbered);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "list_both");
-            var bitmap = TestHelper.RasterizePage(bytes, "list_both");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), PtToPx(bulletStartY), PtToPx(bulletStartY + 14)),
+            TestHelper.SavePdf(bytes, "Tables/bullet-and-numbered-combined");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/bullet-and-numbered-combined");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), TestHelper.PtToPx(bulletStartY), TestHelper.PtToPx(bulletStartY + 14)),
                 "Expected visible text in bullet list section");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), PtToPx(numberedLabelY), PtToPx(numberedLabelY + 14)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), TestHelper.PtToPx(numberedLabelY), TestHelper.PtToPx(numberedLabelY + 14)),
                 "Expected 'Numbered List:' label to be visible");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), PtToPx(numberedStartY), PtToPx(numberedStartY + 14)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), TestHelper.PtToPx(numberedStartY), TestHelper.PtToPx(numberedStartY + 14)),
                 "Expected visible text in numbered list section");
             bitmap.Dispose();
         }
@@ -208,6 +198,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: nested bullet lists with indentation");
             var items = new[]
             {
                 new ListItem("Level 1 item A",
@@ -224,15 +215,15 @@ namespace SimpleTinyPDF.Tests
             Assert.True(endY > 100, "Nested items should produce significant vertical extent");
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "nested_bullet");
-            var bitmap = TestHelper.RasterizePage(bytes, "nested_bullet");
+            TestHelper.SavePdf(bytes, "Tables/nested-bullet-lists");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/nested-bullet-lists");
 
             // Level 1 item at y~50
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), PtToPx(50), PtToPx(64)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), TestHelper.PtToPx(50), TestHelper.PtToPx(64)),
                 "Expected level-1 bullet item at top");
             // Level 2 item should appear below and indented
             float level2Y = 50 + 12 * 1.2f + 12 * 0.3f;
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(70), PtToPx(350), PtToPx(level2Y), PtToPx(level2Y + 28)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(70), TestHelper.PtToPx(350), TestHelper.PtToPx(level2Y), TestHelper.PtToPx(level2Y + 28)),
                 "Expected level-2 item visible below level-1");
 
             bitmap.Dispose();
@@ -243,6 +234,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: nested numbered lists with indentation");
             var items = new[]
             {
                 new ListItem("First top-level item",
@@ -255,11 +247,11 @@ namespace SimpleTinyPDF.Tests
             Assert.True(endY > 80);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "nested_numbered");
-            var bitmap = TestHelper.RasterizePage(bytes, "nested_numbered");
+            TestHelper.SavePdf(bytes, "Tables/nested-numbered-lists");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/nested-numbered-lists");
 
             // Top-level number marker at x~50
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(65), PtToPx(50), PtToPx(64)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(65), TestHelper.PtToPx(50), TestHelper.PtToPx(64)),
                 "Expected top-level number marker");
             bitmap.Dispose();
         }
@@ -269,6 +261,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: nested lists mixing bullet and numbered styles");
             var items = new[]
             {
                 new ListItem("Numbered item 1", ListStyle.Bullet,
@@ -280,15 +273,15 @@ namespace SimpleTinyPDF.Tests
 
             Assert.True(endY > 80);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "nested_mixed");
-            var bitmap = TestHelper.RasterizePage(bytes, "nested_mixed");
+            TestHelper.SavePdf(bytes, "Tables/nested-mixed-styles");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/nested-mixed-styles");
 
             // Top-level number marker at x~50
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(65), PtToPx(50), PtToPx(64)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(65), TestHelper.PtToPx(50), TestHelper.PtToPx(64)),
                 "Expected numbered marker for top-level item");
             // Children are bullets — bullet marker should appear indented
             float childY = 50 + 12 * 1.2f + 12 * 0.3f;
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(70), PtToPx(350), PtToPx(childY), PtToPx(childY + 28)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(70), TestHelper.PtToPx(350), TestHelper.PtToPx(childY), TestHelper.PtToPx(childY + 28)),
                 "Expected bullet child items below the numbered parent");
             bitmap.Dispose();
         }
@@ -298,6 +291,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: nested list items with long text wrap correctly");
             const string longText = "This text is intentionally very long so that it must wrap to multiple lines at this nesting level within the available width";
             var items = new[]
             {
@@ -310,7 +304,7 @@ namespace SimpleTinyPDF.Tests
             // Three long items should each span multiple lines (3 single-line items would only reach ~104pt)
             Assert.True(endY > 120, "Multiple wrapped items across three levels should use significant vertical space");
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "nested_wrap");
+            TestHelper.SavePdf(bytes, "Tables/nested-word-wrapped");
         }
 
         [Fact]
@@ -318,6 +312,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: long nested lists span multiple pages");
 
             // 50 items × ~18pt each = ~900pt starting at y=50, exceeds 842-50=792pt available
             var items = new ListItem[50];
@@ -332,17 +327,17 @@ namespace SimpleTinyPDF.Tests
             Assert.True(endY > 50 && endY < 400, "End Y should be near the top of the last page");
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "nested_multipage");
+            TestHelper.SavePdf(bytes, "Tables/nested-multipage-overflow");
 
             // Page 0: first page — should have content filling most of the page
-            var page0Bitmap = TestHelper.RasterizePage(bytes, "nested_multipage", pageIndex: 0);
-            Assert.True(HasDarkPixelsInRegion(page0Bitmap, PtToPx(50), PtToPx(400), PtToPx(50), PtToPx(750)),
+            var page0Bitmap = TestHelper.RasterizePage(bytes, "Tables/nested-multipage-overflow", pageIndex: 0);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(page0Bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(50), TestHelper.PtToPx(750)),
                 "Expected list content on the first page");
             page0Bitmap.Dispose();
 
             // Page 1: continuation page — should have content starting near the top
-            var page1Bitmap = TestHelper.RasterizePage(bytes, "nested_multipage", pageIndex: 1);
-            Assert.True(HasDarkPixelsInRegion(page1Bitmap, PtToPx(50), PtToPx(400), PtToPx(50), PtToPx(200)),
+            var page1Bitmap = TestHelper.RasterizePage(bytes, "Tables/nested-multipage-overflow", pageIndex: 1);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(page1Bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(50), TestHelper.PtToPx(200)),
                 "Expected list content near the top of the continuation page");
             page1Bitmap.Dispose();
         }
@@ -377,6 +372,7 @@ namespace SimpleTinyPDF.Tests
 
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: lists nested 5 levels deep render correctly");
 
             var (lastPage, endY) = page.DrawList(items,
                 x: 50, y: 50, width: 500,
@@ -388,11 +384,11 @@ namespace SimpleTinyPDF.Tests
                 "Five levels of wrapped items should produce significant vertical extent or overflow to page 2");
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "nested_deep5");
+            TestHelper.SavePdf(bytes, "Tables/nested-5-levels-deep");
             for (int p = 0; p < doc.PageCount; p++)
             {
-                var bmp = TestHelper.RasterizePage(bytes, "nested_deep5", pageIndex: p);
-                Assert.True(HasDarkPixelsInRegion(bmp, PtToPx(50), PtToPx(500), PtToPx(50), PtToPx(700)),
+                var bmp = TestHelper.RasterizePage(bytes, "Tables/nested-5-levels-deep", pageIndex: p);
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bmp, TestHelper.PtToPx(50), TestHelper.PtToPx(500), TestHelper.PtToPx(50), TestHelper.PtToPx(700)),
                     $"Expected visible content on page {p}");
                 bmp.Dispose();
             }
@@ -404,6 +400,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: list with lowercase Roman numeral markers (i, ii, iii)");
             var items = new[]
             {
                 new ListItem("First item"),
@@ -416,13 +413,13 @@ namespace SimpleTinyPDF.Tests
 
             Assert.True(endY > 50);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "list_roman_lower");
-            var bitmap = TestHelper.RasterizePage(bytes, "list_roman_lower");
+            TestHelper.SavePdf(bytes, "Tables/roman-numeral-lowercase");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/roman-numeral-lowercase");
             float itemSpacing = 12 * 1.2f + 12 * 0.3f;
             for (int i = 0; i < items.Length; i++)
             {
                 float itemY = 50 + i * itemSpacing;
-                Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), PtToPx(itemY), PtToPx(itemY + 14)),
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), TestHelper.PtToPx(itemY), TestHelper.PtToPx(itemY + 14)),
                     $"Expected visible content for roman-lower item {i + 1} at Y~{itemY}");
             }
             bitmap.Dispose();
@@ -433,6 +430,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: list with uppercase Roman numeral markers (I, II, III)");
             var items = new[]
             {
                 new ListItem("First item"),
@@ -445,13 +443,13 @@ namespace SimpleTinyPDF.Tests
 
             Assert.True(endY > 50);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "list_roman_upper");
-            var bitmap = TestHelper.RasterizePage(bytes, "list_roman_upper");
+            TestHelper.SavePdf(bytes, "Tables/roman-numeral-uppercase");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/roman-numeral-uppercase");
             float itemSpacing = 12 * 1.2f + 12 * 0.3f;
             for (int i = 0; i < items.Length; i++)
             {
                 float itemY = 50 + i * itemSpacing;
-                Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), PtToPx(itemY), PtToPx(itemY + 14)),
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), TestHelper.PtToPx(itemY), TestHelper.PtToPx(itemY + 14)),
                     $"Expected visible content for roman-upper item {i + 1} at Y~{itemY}");
             }
             bitmap.Dispose();
@@ -462,6 +460,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: all four list styles (bullet, numbered, roman lower, roman upper)");
             // Level 0: Bullet, Level 1: Numbered, Level 2: RomanUpper, Level 3: RomanLower
             var items = new[]
             {
@@ -476,9 +475,9 @@ namespace SimpleTinyPDF.Tests
 
             Assert.True(endY > 100);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "list_allfourstyles");
-            var bitmap = TestHelper.RasterizePage(bytes, "list_allfourstyles");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(480), PtToPx(50), PtToPx(endY)),
+            TestHelper.SavePdf(bytes, "Tables/all-four-list-styles");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/all-four-list-styles");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(480), TestHelper.PtToPx(50), TestHelper.PtToPx(endY)),
                 "Expected visible content across all four list styles");
             bitmap.Dispose();
         }

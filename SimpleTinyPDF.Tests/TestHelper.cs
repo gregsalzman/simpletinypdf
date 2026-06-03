@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using PDFtoImage;
 using SkiaSharp;
 
@@ -17,10 +18,12 @@ namespace SimpleTinyPDF.Tests
 
         /// <summary>
         /// Saves a PDF byte array to TestOutput and returns the file path.
+        /// testName may contain slashes for subdirectory output (e.g. "Text/hello-world").
         /// </summary>
         public static string SavePdf(byte[] pdfBytes, string testName)
         {
             var path = Path.Combine(OutputDir, testName + ".pdf");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllBytes(path, pdfBytes);
             return path;
         }
@@ -32,6 +35,7 @@ namespace SimpleTinyPDF.Tests
         public static SKBitmap RasterizePage(byte[] pdfBytes, string testName, int pageIndex = 0, int dpi = 150)
         {
             var pngPath = Path.Combine(OutputDir, $"{testName}_page{pageIndex}.png");
+            Directory.CreateDirectory(Path.GetDirectoryName(pngPath)!);
             var options = new RenderOptions(Dpi: dpi);
 
             var bitmap = Conversion.ToImage(pdfBytes, page: pageIndex, options: options);
@@ -141,6 +145,63 @@ namespace SimpleTinyPDF.Tests
                     return data.ToArray();
                 }
             }
+        }
+        /// <summary>
+        /// Converts PDF points to pixels at a given DPI.
+        /// </summary>
+        public static int PtToPx(float pt, int dpi = 150) => (int)(pt * dpi / 72.0);
+
+        /// <summary>
+        /// Returns true if any pixel in the region is non-white (dark).
+        /// </summary>
+        public static bool HasDarkPixelsInRegion(SKBitmap bitmap,
+            int xMin, int xMax, int yMin, int yMax)
+        {
+            xMax = Math.Min(xMax, bitmap.Width - 1);
+            yMax = Math.Min(yMax, bitmap.Height - 1);
+            for (int x = xMin; x <= xMax; x++)
+                for (int y = yMin; y <= yMax; y++)
+                {
+                    var p = bitmap.GetPixel(x, y);
+                    if (p.Red < 200 || p.Green < 200 || p.Blue < 200)
+                        return true;
+                }
+            return false;
+        }
+
+        /// <summary>
+        /// Counts dark (non-white) pixels in the region.
+        /// </summary>
+        public static int CountDarkPixelsInRegion(SKBitmap bitmap,
+            int xMin, int xMax, int yMin, int yMax)
+        {
+            xMax = Math.Min(xMax, bitmap.Width - 1);
+            yMax = Math.Min(yMax, bitmap.Height - 1);
+            int count = 0;
+            for (int x = xMin; x <= xMax; x++)
+                for (int y = yMin; y <= yMax; y++)
+                {
+                    var p = bitmap.GetPixel(x, y);
+                    if (p.Red < 200 || p.Green < 200 || p.Blue < 200)
+                        count++;
+                }
+            return count;
+        }
+
+        /// <summary>
+        /// Returns the raw ASCII text of a PDF byte array for content inspection.
+        /// </summary>
+        public static string GetPdfText(byte[] bytes) =>
+            Encoding.ASCII.GetString(bytes);
+
+        /// <summary>
+        /// Draws a small description label at the top of the page to help humans
+        /// understand what the PDF is demonstrating during manual review.
+        /// </summary>
+        public static void AddDescription(PdfPage page, string description)
+        {
+            page.DrawText(description, 10, 10, PdfFont.Helvetica, 8,
+                PdfColor.Rgb(180, 180, 180));
         }
     }
 }

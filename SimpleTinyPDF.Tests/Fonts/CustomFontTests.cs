@@ -10,23 +10,6 @@ namespace SimpleTinyPDF.Tests
         private static readonly string FontPath =
             Path.Combine("TestAssets", "Roboto-Regular.ttf");
 
-        private static int PtToPx(float pt, int dpi = 150) => (int)(pt * dpi / 72.0);
-
-        private static bool HasDarkPixelsInRegion(SkiaSharp.SKBitmap bitmap,
-            int xMin, int xMax, int yMin, int yMax)
-        {
-            xMax = System.Math.Min(xMax, bitmap.Width - 1);
-            yMax = System.Math.Min(yMax, bitmap.Height - 1);
-            for (int x = xMin; x <= xMax; x++)
-                for (int y = yMin; y <= yMax; y++)
-                {
-                    var p = bitmap.GetPixel(x, y);
-                    if (p.Red < 200 || p.Green < 200 || p.Blue < 200)
-                        return true;
-                }
-            return false;
-        }
-
         // ── Font loading ─────────────────────────────────────────────
 
         [Fact]
@@ -179,6 +162,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: custom Roboto TTF font renders 'Hello, Custom Font!'");
             page.DrawText("Hello Custom Font", 50, 50, font, 24);
             var bytes = doc.ToArray();
 
@@ -187,7 +171,7 @@ namespace SimpleTinyPDF.Tests
             var header = Encoding.ASCII.GetString(bytes, 0, 5);
             Assert.Equal("%PDF-", header);
 
-            TestHelper.SavePdf(bytes, "custom_font_hello");
+            TestHelper.SavePdf(bytes, "Fonts/custom-hello-world-roboto");
         }
 
         [Fact]
@@ -196,13 +180,14 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: custom font text is visually present on page");
             page.DrawText("Hello Custom Font", 50, 50, font, 24);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "custom_font_visible");
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_visible");
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), textY, textY + PtToPx(24)),
+            TestHelper.SavePdf(bytes, "Fonts/custom-font-visible-text");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/custom-font-visible-text");
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), textY, textY + TestHelper.PtToPx(24)),
                 "Expected visible text rendered with custom font");
             bitmap.Dispose();
         }
@@ -228,19 +213,20 @@ namespace SimpleTinyPDF.Tests
             var customFont = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: custom and built-in fonts render together on same page");
             page.DrawText("Built-in Helvetica", 50, 50, PdfFont.Helvetica, 18);
             page.DrawText("Custom Roboto", 50, 80, customFont, 18);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "custom_font_mixed");
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_mixed");
+            TestHelper.SavePdf(bytes, "Fonts/custom-and-builtin-mixed");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/custom-and-builtin-mixed");
 
-            int y1 = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), y1, y1 + PtToPx(18)),
+            int y1 = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), y1, y1 + TestHelper.PtToPx(18)),
                 "Expected visible built-in font text");
 
-            int y2 = PtToPx(80);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), y2, y2 + PtToPx(18)),
+            int y2 = TestHelper.PtToPx(80);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), y2, y2 + TestHelper.PtToPx(18)),
                 "Expected visible custom font text");
             bitmap.Dispose();
         }
@@ -251,6 +237,7 @@ namespace SimpleTinyPDF.Tests
             var customFont = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: custom font works in TextSpan rich text");
 
             var spans = new[]
             {
@@ -260,10 +247,10 @@ namespace SimpleTinyPDF.Tests
             page.DrawText(spans, 50, 50);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "custom_font_richtext");
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_richtext");
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), textY, textY + PtToPx(14)),
+            TestHelper.SavePdf(bytes, "Fonts/custom-font-richtext-spans");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/custom-font-richtext-spans");
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), textY, textY + TestHelper.PtToPx(14)),
                 "Expected visible rich text with custom font");
             bitmap.Dispose();
         }
@@ -274,19 +261,20 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: custom font text wraps correctly in textbox");
             page.DrawText(
                 "The quick brown fox jumps over the lazy dog. This is a longer text to test word wrapping.",
                 50, 50, font, 12, width: 200);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "custom_font_wrap");
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_wrap");
+            TestHelper.SavePdf(bytes, "Fonts/custom-font-wrapped-text");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/custom-font-wrapped-text");
             // Should have multiple lines
-            int y1 = PtToPx(50);
-            int y2 = PtToPx(70); // Second line area
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(250), y1, y1 + PtToPx(12)),
+            int y1 = TestHelper.PtToPx(50);
+            int y2 = TestHelper.PtToPx(70); // Second line area
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(250), y1, y1 + TestHelper.PtToPx(12)),
                 "Expected visible wrapped text line 1");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(250), y2, y2 + PtToPx(12)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(250), y2, y2 + TestHelper.PtToPx(12)),
                 "Expected visible wrapped text line 2+");
             bitmap.Dispose();
         }
@@ -297,6 +285,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: custom font renders correctly in table cells");
 
             var table = new PdfTable(100, 200);
             table.HeaderFont = font;
@@ -306,10 +295,10 @@ namespace SimpleTinyPDF.Tests
             page.DrawTable(table, 50, 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "custom_font_table");
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_table");
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(350), textY, textY + PtToPx(40)),
+            TestHelper.SavePdf(bytes, "Fonts/custom-font-in-table");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/custom-font-in-table");
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(350), textY, textY + TestHelper.PtToPx(40)),
                 "Expected visible table with custom font");
             bitmap.Dispose();
         }
@@ -413,14 +402,16 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(path);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            var name = Path.GetFileNameWithoutExtension(filename);
+            TestHelper.AddDescription(page, $"Verify: TTF font {name} renders visible text");
             page.DrawText($"Hello from {filename}", 50, 50, font, 18);
             var bytes = doc.ToArray();
 
-            var testName = $"ttf_{Path.GetFileNameWithoutExtension(filename)}";
+            var testName = $"Fonts/ttf-{name}-hello";
             TestHelper.SavePdf(bytes, testName);
             var bitmap = TestHelper.RasterizePage(bytes, testName);
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(350), textY, textY + PtToPx(18)),
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(350), textY, textY + TestHelper.PtToPx(18)),
                 $"Expected visible text for {filename}");
             bitmap.Dispose();
         }
@@ -476,14 +467,16 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(path);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            var name = Path.GetFileNameWithoutExtension(filename);
+            TestHelper.AddDescription(page, $"Verify: OTF font {name} renders visible text");
             page.DrawText($"Hello from {filename}", 50, 50, font, 18);
             var bytes = doc.ToArray();
 
-            var testName = $"otf_{Path.GetFileNameWithoutExtension(filename)}";
+            var testName = $"Fonts/otf-{name}-hello";
             TestHelper.SavePdf(bytes, testName);
             var bitmap = TestHelper.RasterizePage(bytes, testName);
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(350), textY, textY + PtToPx(18)),
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(350), textY, textY + TestHelper.PtToPx(18)),
                 $"Expected visible text for {filename}");
             bitmap.Dispose();
         }
@@ -556,6 +549,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: underline renders under custom font text");
             page.DrawText("Underlined custom font", 50, 50, font, 14, underline: true);
             var bytes = doc.ToArray();
 
@@ -563,8 +557,8 @@ namespace SimpleTinyPDF.Tests
             var pdfText = Encoding.ASCII.GetString(bytes);
             Assert.Contains("re f", pdfText);
 
-            TestHelper.SavePdf(bytes, "custom_font_underline");
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline");
+            TestHelper.SavePdf(bytes, "Fonts/custom-font-underline");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/custom-font-underline");
             Assert.True(bitmap.Width > 0);
             bitmap.Dispose();
         }
@@ -575,20 +569,21 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: custom font underline is visually present");
             page.DrawText("Underlined text", 50, 50, font, 18, underline: true);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "custom_font_underline_visible");
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline_visible");
+            TestHelper.SavePdf(bytes, "Fonts/custom-font-underline-visible");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/custom-font-underline-visible");
 
             // Check text area has dark pixels
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(250), textY, textY + PtToPx(18)),
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(250), textY, textY + TestHelper.PtToPx(18)),
                 "Expected visible underlined text");
 
             // Check underline region (just below the text baseline)
-            int underlineY = PtToPx(50) + PtToPx(18);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(200), underlineY, underlineY + PtToPx(4)),
+            int underlineY = TestHelper.PtToPx(50) + TestHelper.PtToPx(18);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(200), underlineY, underlineY + TestHelper.PtToPx(4)),
                 "Expected visible underline below text");
             bitmap.Dispose();
         }
@@ -599,13 +594,14 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: custom font underline renders in blue color");
             page.DrawText("Blue underline", 50, 50, font, 14, PdfColor.Blue, underline: true);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "custom_font_underline_blue");
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline_blue");
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(200), textY, textY + PtToPx(18)),
+            TestHelper.SavePdf(bytes, "Fonts/custom-font-underline-blue");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/custom-font-underline-blue");
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(200), textY, textY + TestHelper.PtToPx(18)),
                 "Expected visible blue underlined text");
             bitmap.Dispose();
         }
@@ -616,6 +612,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: underlined custom font text wraps correctly");
             page.DrawText(
                 "This is a longer underlined text that should wrap across multiple lines in the box.",
                 50, 50, font, 12, underline: true, width: 150);
@@ -628,8 +625,8 @@ namespace SimpleTinyPDF.Tests
             while ((idx = pdfText.IndexOf("re f", idx)) >= 0) { reCount++; idx += 4; }
             Assert.True(reCount > 1, $"Expected multiple underline rects for wrapped text, got {reCount}");
 
-            TestHelper.SavePdf(bytes, "custom_font_underline_wrap");
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline_wrap");
+            TestHelper.SavePdf(bytes, "Fonts/custom-font-underline-wrapped");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/custom-font-underline-wrapped");
             Assert.True(bitmap.Width > 0);
             bitmap.Dispose();
         }
@@ -640,6 +637,7 @@ namespace SimpleTinyPDF.Tests
             var customFont = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: underline works with custom font in rich text");
             page.DrawText(new[]
             {
                 new TextSpan("Normal ", PdfFont.Helvetica, 14),
@@ -652,10 +650,10 @@ namespace SimpleTinyPDF.Tests
             var pdfText = Encoding.ASCII.GetString(bytes);
             Assert.Contains("re f", pdfText);
 
-            TestHelper.SavePdf(bytes, "custom_font_underline_richtext");
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline_richtext");
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(400), textY, textY + PtToPx(14)),
+            TestHelper.SavePdf(bytes, "Fonts/custom-font-underline-richtext");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/custom-font-underline-richtext");
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(400), textY, textY + TestHelper.PtToPx(14)),
                 "Expected visible rich text with underlined custom font span");
             bitmap.Dispose();
         }
@@ -666,6 +664,7 @@ namespace SimpleTinyPDF.Tests
             var customFont = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: underlined custom font rich text wraps correctly");
             page.DrawText(new[]
             {
                 new TextSpan("This underlined custom font text should wrap across lines in the box",
@@ -673,14 +672,14 @@ namespace SimpleTinyPDF.Tests
             }, 50, 50, width: 180);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "custom_font_underline_richtext_wrap");
-            var bitmap = TestHelper.RasterizePage(bytes, "custom_font_underline_richtext_wrap");
+            TestHelper.SavePdf(bytes, "Fonts/custom-font-underline-richtext-wrap");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/custom-font-underline-richtext-wrap");
             // Multiple lines should be visible
-            int y1 = PtToPx(50);
-            int y2 = PtToPx(65);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(230), y1, y1 + PtToPx(12)),
+            int y1 = TestHelper.PtToPx(50);
+            int y2 = TestHelper.PtToPx(65);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(230), y1, y1 + TestHelper.PtToPx(12)),
                 "Expected visible wrapped underlined text line 1");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(230), y2, y2 + PtToPx(12)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(230), y2, y2 + TestHelper.PtToPx(12)),
                 "Expected visible wrapped underlined text line 2");
             bitmap.Dispose();
         }
@@ -696,14 +695,16 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(path);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            var name = Path.GetFileNameWithoutExtension(filename);
+            TestHelper.AddDescription(page, $"Verify: underline renders for font {name}");
             page.DrawText($"Underlined {filename}", 50, 50, font, 16, underline: true);
             var bytes = doc.ToArray();
 
-            var testName = $"underline_{Path.GetFileNameWithoutExtension(filename)}";
+            var testName = $"Fonts/underline-{name}";
             TestHelper.SavePdf(bytes, testName);
             var bitmap = TestHelper.RasterizePage(bytes, testName);
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(350), textY, textY + PtToPx(16)),
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(350), textY, textY + TestHelper.PtToPx(16)),
                 $"Expected visible underlined text for {filename}");
             bitmap.Dispose();
         }
@@ -727,6 +728,7 @@ namespace SimpleTinyPDF.Tests
 
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: all custom TTF and OTF fonts render correctly");
             float y = 40;
 
             foreach (var (file, label) in fonts)
@@ -737,15 +739,15 @@ namespace SimpleTinyPDF.Tests
             }
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "all_custom_fonts");
-            var bitmap = TestHelper.RasterizePage(bytes, "all_custom_fonts");
+            TestHelper.SavePdf(bytes, "Fonts/all-custom-fonts-showcase");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/all-custom-fonts-showcase");
 
             // Check each line rendered
             float checkY = 40;
             for (int i = 0; i < fonts.Length; i++)
             {
-                int py = PtToPx(checkY);
-                Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(500), py, py + PtToPx(14)),
+                int py = TestHelper.PtToPx(checkY);
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(500), py, py + TestHelper.PtToPx(14)),
                     $"Expected visible text for {fonts[i].label} at Y={checkY}");
                 checkY += 24;
             }
@@ -761,6 +763,7 @@ namespace SimpleTinyPDF.Tests
 
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: multiple custom fonts render inline in rich text");
             var spans = new[]
             {
                 new TextSpan("Sans: Hello ", openSans, 14f, PdfColor.Black),
@@ -770,10 +773,10 @@ namespace SimpleTinyPDF.Tests
             page.DrawText(spans, 50, 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "richtext_multi_custom");
-            var bitmap = TestHelper.RasterizePage(bytes, "richtext_multi_custom");
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(450), textY, textY + PtToPx(14)),
+            TestHelper.SavePdf(bytes, "Fonts/richtext-multiple-custom-fonts");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/richtext-multiple-custom-fonts");
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(450), textY, textY + TestHelper.PtToPx(14)),
                 "Expected visible rich text with multiple custom fonts");
             bitmap.Dispose();
         }

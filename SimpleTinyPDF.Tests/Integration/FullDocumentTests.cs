@@ -4,27 +4,12 @@ namespace SimpleTinyPDF.Tests
 {
     public class FullDocumentTests
     {
-        private static int PtToPx(float pt) => (int)(pt * 150 / 72.0);
-
-        private static bool HasDarkPixelsInRegion(SkiaSharp.SKBitmap bitmap,
-            int xMin, int xMax, int yMin, int yMax)
-        {
-            xMax = System.Math.Min(xMax, bitmap.Width - 1);
-            yMax = System.Math.Min(yMax, bitmap.Height - 1);
-            for (int x = System.Math.Max(0, xMin); x <= xMax; x++)
-                for (int y = System.Math.Max(0, yMin); y <= yMax; y++)
-                {
-                    var p = bitmap.GetPixel(x, y);
-                    if (p.Red < 200 || p.Green < 200 || p.Blue < 200) return true;
-                }
-            return false;
-        }
-
         [Fact]
         public void InvoiceDocument_AllFeatures()
         {
             var doc = new PdfDocument { Title = "Invoice #1001", Author = "Acme Corp" };
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: complete invoice with header, table, totals, and footer");
 
             // Title
             page.DrawText("INVOICE", 50, 40, PdfFont.HelveticaBold, 28, PdfColor.Rgb(0, 51, 102));
@@ -98,25 +83,25 @@ namespace SimpleTinyPDF.Tests
                 PdfColor.DarkGray, TextAlignment.Center);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "full_invoice");
-            var bitmap = TestHelper.RasterizePage(bytes, "full_invoice");
+            TestHelper.SavePdf(bytes, "Integration/full-invoice-document");
+            var bitmap = TestHelper.RasterizePage(bytes, "Integration/full-invoice-document");
             // Verify title "INVOICE" is visible near top
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(200), PtToPx(40), PtToPx(70)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(200), TestHelper.PtToPx(40), TestHelper.PtToPx(70)),
                 "Expected 'INVOICE' title text to be visible");
             // Verify the horizontal rule area has dark pixels
-            int ruleY = PtToPx(75);
+            int ruleY = TestHelper.PtToPx(75);
             bool foundRule = false;
-            for (int x = PtToPx(50); x < PtToPx(545) && !foundRule; x++)
+            for (int x = TestHelper.PtToPx(50); x < TestHelper.PtToPx(545) && !foundRule; x++)
             {
                 var p = bitmap.GetPixel(x, ruleY);
                 if (p.Red < 100 && p.Green < 100) foundRule = true;
             }
             Assert.True(foundRule, "Expected horizontal rule to be visible");
             // Verify table area has content (table starts around Y=180-200)
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(500), PtToPx(180), PtToPx(350)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(500), TestHelper.PtToPx(180), TestHelper.PtToPx(350)),
                 "Expected table content to be visible in the invoice");
             // Verify footer text near bottom
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(200), PtToPx(400), PtToPx(795), PtToPx(815)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(200), TestHelper.PtToPx(400), TestHelper.PtToPx(795), TestHelper.PtToPx(815)),
                 "Expected footer text near bottom of page");
             bitmap.Dispose();
         }
@@ -128,6 +113,7 @@ namespace SimpleTinyPDF.Tests
 
             // Page 1: Title and intro
             var page1 = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page1, "Verify: multi-page report with all features");
             page1.DrawFilledRectangle(0, 0, 595, 100, PdfColor.Rgb(0, 51, 102));
             page1.DrawText("Quarterly Report", 50, 40, PdfFont.HelveticaBold, 32, PdfColor.White);
             page1.DrawText("Q4 2025", 50, 75, PdfFont.Helvetica, 18, PdfColor.Rgb(200, 200, 255));
@@ -183,25 +169,25 @@ namespace SimpleTinyPDF.Tests
             page1.DrawTable(table, 50, y, continuationY: 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "full_report");
+            TestHelper.SavePdf(bytes, "Integration/full-report-multipage");
             int pageCount = TestHelper.GetPageCount(bytes);
             Assert.True(pageCount >= 2, $"Expected multi-page report, got {pageCount} pages");
 
             // Rasterize and verify every page has actual content (not just blank)
             for (int i = 0; i < pageCount; i++)
             {
-                var bitmap = TestHelper.RasterizePage(bytes, "full_report", i);
+                var bitmap = TestHelper.RasterizePage(bytes, "Integration/full-report-multipage", i);
                 // Every page should have non-white pixels (content)
-                bool hasContent = HasDarkPixelsInRegion(bitmap, PtToPx(30), bitmap.Width - PtToPx(30),
-                    PtToPx(30), bitmap.Height - PtToPx(30));
+                bool hasContent = TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(30), bitmap.Width - TestHelper.PtToPx(30),
+                    TestHelper.PtToPx(30), bitmap.Height - TestHelper.PtToPx(30));
                 Assert.True(hasContent, $"Page {i + 1} should have visible content, not be blank");
                 bitmap.Dispose();
             }
 
             // Page 1 should have the blue header banner
-            var page1Bmp = TestHelper.RasterizePage(bytes, "full_report_verify", 0);
-            int bannerY = PtToPx(50); // center of the 100pt tall banner
-            var bannerPx = page1Bmp.GetPixel(PtToPx(297), bannerY);
+            var page1Bmp = TestHelper.RasterizePage(bytes, "Integration/full-report-multipage-verify", 0);
+            int bannerY = TestHelper.PtToPx(50); // center of the 100pt tall banner
+            var bannerPx = page1Bmp.GetPixel(TestHelper.PtToPx(297), bannerY);
             Assert.True(bannerPx.Red < 50 && bannerPx.Blue > 80,
                 $"Expected dark blue banner at top of page 1, got ({bannerPx.Red},{bannerPx.Green},{bannerPx.Blue})");
             page1Bmp.Dispose();
@@ -212,6 +198,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: document using CMYK color space");
 
             page.DrawFilledRectangle(50, 50, 100, 50, PdfColor.Cmyk(1, 0, 0, 0)); // Cyan
             page.DrawFilledRectangle(200, 50, 100, 50, PdfColor.Cmyk(0, 1, 0, 0)); // Magenta
@@ -225,29 +212,29 @@ namespace SimpleTinyPDF.Tests
             page.DrawLine(50, 150, 500, 150, PdfColor.Cmyk(0, 0, 0, 1), 2);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "full_cmyk");
-            var bitmap = TestHelper.RasterizePage(bytes, "full_cmyk");
+            TestHelper.SavePdf(bytes, "Integration/cmyk-color-document");
+            var bitmap = TestHelper.RasterizePage(bytes, "Integration/cmyk-color-document");
             // CMYK Cyan rect center at (100, 75) — should render as cyan-ish
-            int cyanX = PtToPx(100), cyanY = PtToPx(75);
+            int cyanX = TestHelper.PtToPx(100), cyanY = TestHelper.PtToPx(75);
             var cyanPx = bitmap.GetPixel(cyanX, cyanY);
             Assert.True(cyanPx.Blue > 150 || cyanPx.Green > 150,
                 $"Expected cyan-ish fill, got ({cyanPx.Red},{cyanPx.Green},{cyanPx.Blue})");
             Assert.True(cyanPx.Red < 100,
                 $"Cyan should have low red component, got R={cyanPx.Red}");
             // CMYK Magenta rect center at (250, 75) — should render as magenta-ish
-            int magX = PtToPx(250), magY = PtToPx(75);
+            int magX = TestHelper.PtToPx(250), magY = TestHelper.PtToPx(75);
             var magPx = bitmap.GetPixel(magX, magY);
             Assert.True(magPx.Red > 150 || magPx.Blue > 150,
                 $"Expected magenta-ish fill, got ({magPx.Red},{magPx.Green},{magPx.Blue})");
             // CMYK Yellow rect center at (400, 75) — should render as yellow-ish
-            int yelX = PtToPx(400), yelY = PtToPx(75);
+            int yelX = TestHelper.PtToPx(400), yelY = TestHelper.PtToPx(75);
             var yelPx = bitmap.GetPixel(yelX, yelY);
             Assert.True(yelPx.Red > 150 && yelPx.Green > 150,
                 $"Expected yellow-ish fill, got ({yelPx.Red},{yelPx.Green},{yelPx.Blue})");
             // The black line at Y=150 should have dark pixels
-            int lineY = PtToPx(150);
+            int lineY = TestHelper.PtToPx(150);
             bool foundLine = false;
-            for (int x = PtToPx(100); x < PtToPx(400) && !foundLine; x++)
+            for (int x = TestHelper.PtToPx(100); x < TestHelper.PtToPx(400) && !foundLine; x++)
             {
                 var p = bitmap.GetPixel(x, lineY);
                 if (p.Red < 50 && p.Green < 50 && p.Blue < 50) foundLine = true;
@@ -260,7 +247,8 @@ namespace SimpleTinyPDF.Tests
         public void AllPageSizes_Work()
         {
             var doc = new PdfDocument();
-            doc.AddPage(PageSize.A3);
+            var firstPage = doc.AddPage(PageSize.A3);
+            TestHelper.AddDescription(firstPage, "Verify: document with all standard page sizes");
             doc.AddPage(PageSize.A4);
             doc.AddPage(PageSize.A5);
             doc.AddPage(PageSize.Letter);
@@ -269,15 +257,15 @@ namespace SimpleTinyPDF.Tests
             doc.AddPage(new PageSize(400, 600)); // custom
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "full_all_sizes");
+            TestHelper.SavePdf(bytes, "Integration/all-page-sizes");
             Assert.Equal(7, TestHelper.GetPageCount(bytes));
 
             // Verify different page sizes produce different rasterized dimensions
-            var bmpA3 = TestHelper.RasterizePage(bytes, "full_all_sizes", 0);
-            var bmpA4 = TestHelper.RasterizePage(bytes, "full_all_sizes", 1);
-            var bmpA5 = TestHelper.RasterizePage(bytes, "full_all_sizes", 2);
-            var bmpLandscape = TestHelper.RasterizePage(bytes, "full_all_sizes", 5);
-            var bmpCustom = TestHelper.RasterizePage(bytes, "full_all_sizes", 6);
+            var bmpA3 = TestHelper.RasterizePage(bytes, "Integration/all-page-sizes", 0);
+            var bmpA4 = TestHelper.RasterizePage(bytes, "Integration/all-page-sizes", 1);
+            var bmpA5 = TestHelper.RasterizePage(bytes, "Integration/all-page-sizes", 2);
+            var bmpLandscape = TestHelper.RasterizePage(bytes, "Integration/all-page-sizes", 5);
+            var bmpCustom = TestHelper.RasterizePage(bytes, "Integration/all-page-sizes", 6);
 
             // A3 should be larger than A4
             Assert.True(bmpA3.Width > bmpA4.Width, "A3 should be wider than A4");

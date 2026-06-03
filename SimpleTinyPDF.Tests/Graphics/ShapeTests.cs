@@ -9,11 +9,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: black line renders on page");
             page.DrawLine(50, 100, 500, 100, PdfColor.Black, 2);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "shape_line");
-            var bitmap = TestHelper.RasterizePage(bytes, "shape_line");
+            TestHelper.SavePdf(bytes, "Graphics/line-black-default");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/line-black-default");
             // Check for dark pixels along the line area (y=100 -> ~208px at 150dpi)
             int lineY = (int)(100 * 150 / 72.0);
             bool foundDark = false;
@@ -35,11 +36,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: red colored line renders on page");
             page.DrawLine(50, 100, 500, 100, PdfColor.Red, 3);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "shape_line_red");
-            var bitmap = TestHelper.RasterizePage(bytes, "shape_line_red");
+            TestHelper.SavePdf(bytes, "Graphics/line-red-colored");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/line-red-colored");
             int lineY = (int)(100 * 150 / 72.0);
             bool foundRed = false;
             for (int x = 130; x < 800; x++)
@@ -60,11 +62,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: rectangle outline (no fill) renders");
             page.DrawRectangle(100, 100, 200, 100, PdfColor.Black, 2);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "shape_rect");
-            var bitmap = TestHelper.RasterizePage(bytes, "shape_rect");
+            TestHelper.SavePdf(bytes, "Graphics/rectangle-outline");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rectangle-outline");
             // Top edge of rect at Y=100 -> check for dark pixels along top edge
             int topY = (int)(100 * 150 / 72.0);
             bool foundTopEdge = false;
@@ -88,11 +91,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: blue filled rectangle renders");
             page.DrawFilledRectangle(100, 100, 200, 100, PdfColor.Blue);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "shape_filled_rect");
-            var bitmap = TestHelper.RasterizePage(bytes, "shape_filled_rect");
+            TestHelper.SavePdf(bytes, "Graphics/rectangle-filled-blue");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rectangle-filled-blue");
             // Check center of the rectangle for blue
             int cx = (int)((100 + 100) * 150 / 72.0);
             int cy = (int)((100 + 50) * 150 / 72.0);
@@ -107,12 +111,13 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: filled rectangle with border renders");
             page.DrawFilledRectangle(100, 100, 200, 100,
                 PdfColor.LightGray, PdfColor.Black, 2);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "shape_filled_rect_border");
-            var bitmap = TestHelper.RasterizePage(bytes, "shape_filled_rect_border");
+            TestHelper.SavePdf(bytes, "Graphics/rectangle-filled-with-border");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/rectangle-filled-with-border");
             // Interior should be light gray (fill)
             int cx = (int)(200 * 150 / 72.0);
             int cy = (int)(150 * 150 / 72.0);
@@ -136,13 +141,14 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: lines render at different thicknesses");
             page.DrawLine(50, 50, 500, 50, lineWidth: 0.5f);
             page.DrawLine(50, 80, 500, 80, lineWidth: 2f);
             page.DrawLine(50, 120, 500, 120, lineWidth: 5f);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "shape_line_thickness");
-            var bitmap = TestHelper.RasterizePage(bytes, "shape_line_thickness");
+            TestHelper.SavePdf(bytes, "Graphics/line-varying-thickness");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/line-varying-thickness");
             // Count dark pixels vertically at x=300 for each line to verify thickness differences
             int scanX = (int)(300 * 150 / 72.0);
             int thinDark = 0, medDark = 0, thickDark = 0;
@@ -178,6 +184,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: multiple shapes render together on page");
             page.DrawFilledRectangle(50, 50, 100, 50, PdfColor.Red);
             page.DrawFilledRectangle(200, 50, 100, 50, PdfColor.Green);
             page.DrawFilledRectangle(350, 50, 100, 50, PdfColor.Blue);
@@ -185,8 +192,8 @@ namespace SimpleTinyPDF.Tests
             page.DrawRectangle(50, 150, 400, 200, PdfColor.DarkGray, 2);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "shape_multiple");
-            var bitmap = TestHelper.RasterizePage(bytes, "shape_multiple");
+            TestHelper.SavePdf(bytes, "Graphics/multiple-shapes-combined");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/multiple-shapes-combined");
             // Verify each colored rectangle at its center
             // Red rect center: (100, 75)
             int rx = (int)(100 * 150 / 72.0), ry = (int)(75 * 150 / 72.0);

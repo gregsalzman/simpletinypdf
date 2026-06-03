@@ -10,23 +10,6 @@ namespace SimpleTinyPDF.Tests
         private static readonly string FontPath =
             Path.Combine("TestAssets", "Roboto-Regular.ttf");
 
-        private static int PtToPx(float pt, int dpi = 150) => (int)(pt * dpi / 72.0);
-
-        private static bool HasDarkPixelsInRegion(SkiaSharp.SKBitmap bitmap,
-            int xMin, int xMax, int yMin, int yMax)
-        {
-            xMax = System.Math.Min(xMax, bitmap.Width - 1);
-            yMax = System.Math.Min(yMax, bitmap.Height - 1);
-            for (int x = xMin; x <= xMax; x++)
-                for (int y = yMin; y <= yMax; y++)
-                {
-                    var p = bitmap.GetPixel(x, y);
-                    if (p.Red < 200 || p.Green < 200 || p.Blue < 200)
-                        return true;
-                }
-            return false;
-        }
-
         // ── Size reduction ──────────────────────────────────────────
 
         [Fact]
@@ -70,6 +53,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(cjkPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: CJK font subsetting dramatically reduces PDF size");
 
             // Mix of hiragana, katakana, kanji, and Latin
             page.DrawText("\u6771\u4EAC\u90FD Tokyo", 50, 50, font, 28);          // 東京都 Tokyo
@@ -83,19 +67,19 @@ namespace SimpleTinyPDF.Tests
                 $"Subset PDF ({bytes.Length}) should be <10% of full font ({fullFontSize})");
 
             // Verify all three lines render
-            TestHelper.SavePdf(bytes, "subset_cjk_large");
-            var bitmap = TestHelper.RasterizePage(bytes, "subset_cjk_large");
+            TestHelper.SavePdf(bytes, "Fonts/subset-cjk-large-reduction");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/subset-cjk-large-reduction");
 
-            int y1 = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), y1, y1 + PtToPx(28)),
+            int y1 = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), y1, y1 + TestHelper.PtToPx(28)),
                 "Kanji/Latin line should render");
 
-            int y2 = PtToPx(90);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), y2, y2 + PtToPx(20)),
+            int y2 = TestHelper.PtToPx(90);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), y2, y2 + TestHelper.PtToPx(20)),
                 "Hiragana line should render");
 
-            int y3 = PtToPx(120);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(200), y3, y3 + PtToPx(20)),
+            int y3 = TestHelper.PtToPx(120);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(200), y3, y3 + TestHelper.PtToPx(20)),
                 "Katakana line should render");
 
             bitmap.Dispose();
@@ -152,14 +136,16 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(path);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            var name = Path.GetFileNameWithoutExtension(filename);
+            TestHelper.AddDescription(page, $"Verify: subset font {name} renders visible text");
             page.DrawText("Hello World!", 50, 50, font, 18);
             var bytes = doc.ToArray();
 
-            var testName = $"subset_{Path.GetFileNameWithoutExtension(filename)}";
+            var testName = $"Fonts/subset-{name}";
             TestHelper.SavePdf(bytes, testName);
             var bitmap = TestHelper.RasterizePage(bytes, testName);
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), textY, textY + PtToPx(18)),
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), textY, textY + TestHelper.PtToPx(18)),
                 $"Subset font {filename} should render visible text");
             bitmap.Dispose();
         }
@@ -170,13 +156,14 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(FontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: composite glyphs (accented chars) preserved after subsetting");
             page.DrawText("\u00E9\u00E8\u00EA\u00EB", 50, 50, font, 24);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "subset_composite");
-            var bitmap = TestHelper.RasterizePage(bytes, "subset_composite");
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(200), textY, textY + PtToPx(24)),
+            TestHelper.SavePdf(bytes, "Fonts/subset-composite-glyphs");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/subset-composite-glyphs");
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(200), textY, textY + TestHelper.PtToPx(24)),
                 "Composite (accented) characters should render correctly with subsetting");
             bitmap.Dispose();
         }
@@ -242,13 +229,14 @@ namespace SimpleTinyPDF.Tests
 
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: full font embedded when subsetting disabled");
             page.DrawText("Hello World!", 50, 50, font, 18);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "no_subset");
-            var bitmap = TestHelper.RasterizePage(bytes, "no_subset");
-            int textY = PtToPx(50);
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(300), textY, textY + PtToPx(18)),
+            TestHelper.SavePdf(bytes, "Fonts/no-subset-full-font");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/no-subset-full-font");
+            int textY = TestHelper.PtToPx(50);
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(300), textY, textY + TestHelper.PtToPx(18)),
                 "Full-embed font should render visible text");
             bitmap.Dispose();
         }

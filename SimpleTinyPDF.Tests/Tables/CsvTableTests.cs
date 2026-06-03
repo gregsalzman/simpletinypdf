@@ -194,24 +194,23 @@ namespace SimpleTinyPDF.Tests
 
         // --- Integration / rendering test ---
 
-        private static int PtToPx(float pt) => (int)(pt * 150 / 72.0);
-
         [Fact]
         public void FromCsvString_RendersTable()
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: table created from CSV data renders correctly");
             var table = PdfTable.FromCsvString("Name,Age\nAlice,30\nBob,25");
             page.DrawTable(table, 50, 50);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "csv_table_basic");
-            var bitmap = TestHelper.RasterizePage(bytes, "csv_table_basic");
+            TestHelper.SavePdf(bytes, "Tables/csv-parsed-table");
+            var bitmap = TestHelper.RasterizePage(bytes, "Tables/csv-parsed-table");
 
             // Verify header area has visible content
             bool found = false;
-            for (int x = PtToPx(50); x < PtToPx(300) && !found; x++)
-                for (int y = PtToPx(50); y < PtToPx(70) && !found; y++)
+            for (int x = TestHelper.PtToPx(50); x < TestHelper.PtToPx(300) && !found; x++)
+                for (int y = TestHelper.PtToPx(50); y < TestHelper.PtToPx(70) && !found; y++)
                 {
                     var p = bitmap.GetPixel(x, y);
                     if (p.Red < 200 || p.Green < 200 || p.Blue < 200) found = true;

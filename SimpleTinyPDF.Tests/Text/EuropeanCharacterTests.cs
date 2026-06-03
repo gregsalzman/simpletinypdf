@@ -304,6 +304,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             doc.Title = "European Language Test";
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: European characters (Polish, Czech, etc.) render correctly with built-in fonts");
             float y = 50;
             float lineHeight = 20;
 
@@ -356,8 +357,8 @@ namespace SimpleTinyPDF.Tests
                 50, y, width: 300);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "european_languages");
-            var bitmap = TestHelper.RasterizePage(bytes, "european_languages");
+            TestHelper.SavePdf(bytes, "Text/european-characters-showcase");
+            var bitmap = TestHelper.RasterizePage(bytes, "Text/european-characters-showcase");
             Assert.True(bitmap.Width > 0);
         }
     }

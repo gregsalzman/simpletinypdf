@@ -62,12 +62,13 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Separation (spot) color fills rectangle");
             var spot = PdfColor.Spot("PANTONE 185 C", 0f, 0.91f, 0.76f, 0f);
             page.DrawFilledRectangle(50, 50, 200, 100, spot);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "spot_filled_rect");
-            var bitmap = TestHelper.RasterizePage(bytes, "spot_filled_rect");
+            TestHelper.SavePdf(bytes, "Graphics/spot-color-filled-rect");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/spot-color-filled-rect");
 
             // The spot color fallback is a strong magenta-red (C=0, M=0.91, Y=0.76, K=0)
             // Check center of rectangle for non-white pixels
@@ -84,14 +85,15 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: spot color tints at different percentages");
             var full = PdfColor.Spot("TestInk", 1f, 0f, 0f, 0f);
             var half = full.WithTint(0.5f);
             page.DrawFilledRectangle(50, 50, 200, 100, full);
             page.DrawFilledRectangle(50, 200, 200, 100, half);
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "spot_tint_comparison");
-            var bitmap = TestHelper.RasterizePage(bytes, "spot_tint_comparison");
+            TestHelper.SavePdf(bytes, "Graphics/spot-color-tint-comparison");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/spot-color-tint-comparison");
 
             // Full tint should be darker (more cyan = less red in RGB)
             int cx = (int)(150 * 150 / 72.0);

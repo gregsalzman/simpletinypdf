@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using SkiaSharp;
 using Xunit;
 
 namespace SimpleTinyPDF.Tests
@@ -13,22 +12,6 @@ namespace SimpleTinyPDF.Tests
     {
         private static readonly string AssetsDir = Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory, "TestAssets");
-
-        private static int PtToPx(float pt) => (int)(pt * 150 / 72.0);
-
-        private static bool HasDarkPixelsInRegion(SKBitmap bitmap,
-            int xMin, int xMax, int yMin, int yMax)
-        {
-            xMax = Math.Min(xMax, bitmap.Width - 1);
-            yMax = Math.Min(yMax, bitmap.Height - 1);
-            for (int x = Math.Max(0, xMin); x <= xMax; x += 3)
-                for (int y = Math.Max(0, yMin); y <= yMax; y += 3)
-                {
-                    var p = bitmap.GetPixel(x, y);
-                    if (p.Red < 240 || p.Green < 240 || p.Blue < 240) return true;
-                }
-            return false;
-        }
 
         // ── JPEG: Himalayan mountains (progressive, landscape, 1920x1285) ──
 
@@ -49,17 +32,18 @@ namespace SimpleTinyPDF.Tests
 
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: high-resolution landscape photo renders correctly");
             doc.AddImage(image);
             float scale = 500f / image.PixelWidth;
             float w = 500, h = image.PixelHeight * scale;
             page.DrawImage(image, 50, 50, w, h);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "real_himalayan");
-            var bitmap = TestHelper.RasterizePage(bytes, "real_himalayan");
+            TestHelper.SavePdf(bytes, "Images/real-photo-himalayan-landscape");
+            var bitmap = TestHelper.RasterizePage(bytes, "Images/real-photo-himalayan-landscape");
 
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(60), PtToPx(540), PtToPx(60), PtToPx(50 + h - 10)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(60), TestHelper.PtToPx(540), TestHelper.PtToPx(60), TestHelper.PtToPx(50 + h - 10)),
                 "Himalayan JPEG should render visible content");
             bitmap.Dispose();
         }
@@ -83,16 +67,17 @@ namespace SimpleTinyPDF.Tests
 
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: high-resolution portrait photo renders correctly");
             doc.AddImage(image);
             float w = 200, h = 300; // portrait aspect
             page.DrawImage(image, 50, 50, w, h);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "real_echinacea_portrait");
-            var bitmap = TestHelper.RasterizePage(bytes, "real_echinacea_portrait");
+            TestHelper.SavePdf(bytes, "Images/real-photo-echinacea-portrait");
+            var bitmap = TestHelper.RasterizePage(bytes, "Images/real-photo-echinacea-portrait");
 
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(60), PtToPx(240), PtToPx(60), PtToPx(340)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(60), TestHelper.PtToPx(240), TestHelper.PtToPx(60), TestHelper.PtToPx(340)),
                 "Echinacea portrait JPEG should render visible content");
             bitmap.Dispose();
         }
@@ -104,6 +89,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument { Title = "Real Image Gallery" };
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: multiple real photos across pages");
 
             float y = 30;
             string[] files = { "himalayan-mountains-1389998575T1I.jpg",
@@ -130,13 +116,13 @@ namespace SimpleTinyPDF.Tests
             }
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "real_gallery");
-            var bitmap = TestHelper.RasterizePage(bytes, "real_gallery");
+            TestHelper.SavePdf(bytes, "Images/real-photo-gallery-multipage");
+            var bitmap = TestHelper.RasterizePage(bytes, "Images/real-photo-gallery-multipage");
 
             // Verify content is visible throughout the page
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(50), PtToPx(250), PtToPx(30), PtToPx(200)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(50), TestHelper.PtToPx(250), TestHelper.PtToPx(30), TestHelper.PtToPx(200)),
                 "Top portion should have image content");
-            Assert.True(HasDarkPixelsInRegion(bitmap, PtToPx(260), PtToPx(500), PtToPx(30), PtToPx(100)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap, TestHelper.PtToPx(260), TestHelper.PtToPx(500), TestHelper.PtToPx(30), TestHelper.PtToPx(100)),
                 "Labels should be visible");
             bitmap.Dispose();
         }

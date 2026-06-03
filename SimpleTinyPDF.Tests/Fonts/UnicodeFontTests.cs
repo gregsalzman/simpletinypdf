@@ -12,23 +12,6 @@ namespace SimpleTinyPDF.Tests
         private static readonly string RobotoFontPath =
             Path.Combine("TestAssets", "Roboto-Regular.ttf");
 
-        private static int PtToPx(float pt, int dpi = 150) => (int)(pt * dpi / 72.0);
-
-        private static bool HasDarkPixelsInRegion(SkiaSharp.SKBitmap bitmap,
-            int xMin, int xMax, int yMin, int yMax)
-        {
-            xMax = System.Math.Min(xMax, bitmap.Width - 1);
-            yMax = System.Math.Min(yMax, bitmap.Height - 1);
-            for (int x = xMin; x <= xMax; x++)
-                for (int y = yMin; y <= yMax; y++)
-                {
-                    var pixel = bitmap.GetPixel(x, y);
-                    if (pixel.Red < 100 && pixel.Green < 100 && pixel.Blue < 100)
-                        return true;
-                }
-            return false;
-        }
-
         // ── CJK rendering ──────────────────────────────────────────
 
         [Fact]
@@ -37,14 +20,15 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Japanese CJK characters render with NotoSansJP font");
             // "こんにちは" = Konnichiwa in Hiragana
             page.DrawText("\u3053\u3093\u306B\u3061\u306F", 50, 50, font, 24);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_cjk_japanese");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-cjk-japanese");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_cjk_japanese");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50) - 5, PtToPx(200), PtToPx(35), PtToPx(60)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-cjk-japanese");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50) - 5, TestHelper.PtToPx(200), TestHelper.PtToPx(35), TestHelper.PtToPx(60)),
                 "CJK Japanese text should render visible pixels");
             bitmap.Dispose();
         }
@@ -55,14 +39,15 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Chinese CJK characters render correctly");
             // "世界" = World in Chinese
             page.DrawText("\u4E16\u754C", 50, 50, font, 24);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_cjk_chinese");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-cjk-chinese");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_cjk_chinese");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50) - 5, PtToPx(120), PtToPx(35), PtToPx(60)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-cjk-chinese");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50) - 5, TestHelper.PtToPx(120), TestHelper.PtToPx(35), TestHelper.PtToPx(60)),
                 "CJK Chinese text should render visible pixels");
             bitmap.Dispose();
         }
@@ -75,14 +60,15 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(RobotoFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Cyrillic characters render correctly");
             // "Привет" = Hello in Russian
             page.DrawText("\u041F\u0440\u0438\u0432\u0435\u0442", 50, 50, font, 24);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_cyrillic");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-cyrillic-text");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_cyrillic");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50) - 5, PtToPx(200), PtToPx(35), PtToPx(60)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-cyrillic-text");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50) - 5, TestHelper.PtToPx(200), TestHelper.PtToPx(35), TestHelper.PtToPx(60)),
                 "Cyrillic text should render visible pixels");
             bitmap.Dispose();
         }
@@ -95,19 +81,20 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Latin and CJK text render together on same line");
             // "Hello 世界" = Hello World
             page.DrawText("Hello \u4E16\u754C", 50, 50, font, 24);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_mixed_latin_cjk");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-mixed-latin-cjk");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_mixed_latin_cjk");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-mixed-latin-cjk");
             // Latin part
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50) - 5, PtToPx(120), PtToPx(35), PtToPx(60)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50) - 5, TestHelper.PtToPx(120), TestHelper.PtToPx(35), TestHelper.PtToPx(60)),
                 "Latin part should render");
             // CJK part (to the right)
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(120), PtToPx(250), PtToPx(35), PtToPx(60)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(120), TestHelper.PtToPx(250), TestHelper.PtToPx(35), TestHelper.PtToPx(60)),
                 "CJK part should render");
             bitmap.Dispose();
         }
@@ -118,17 +105,18 @@ namespace SimpleTinyPDF.Tests
             var cjkFont = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Unicode text works in rich text spans");
             page.DrawText(new[]
             {
                 new TextSpan("Hello ", PdfFont.HelveticaBold, 20),
                 new TextSpan("\u4E16\u754C", cjkFont, 20)
             }, 50, 50);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_richtext_mixed");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-richtext-mixed");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_richtext_mixed");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50) - 5, PtToPx(250), PtToPx(35), PtToPx(60)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-richtext-mixed");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50) - 5, TestHelper.PtToPx(250), TestHelper.PtToPx(35), TestHelper.PtToPx(60)),
                 "Mixed rich text should render");
             bitmap.Dispose();
         }
@@ -205,11 +193,12 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page1 = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page1, "Verify: same custom font is deduplicated across pages");
             page1.DrawText("\u3053\u3093", 50, 50, font, 12); // first two chars
             var page2 = doc.AddPage(PageSize.A4);
             page2.DrawText("\u306B\u3061\u306F", 50, 50, font, 12); // next three chars
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_dedup");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-font-deduplication");
 
             var pdfText = Encoding.ASCII.GetString(bytes);
 
@@ -260,11 +249,12 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
 
+            TestHelper.AddDescription(page, "Verify: CJK text wraps correctly in textbox");
             // Draw CJK words separated by spaces in a narrow box
             string longText = "\u3053\u3093\u306B\u3061\u306F \u4E16\u754C \u3053\u3093\u306B\u3061\u306F \u4E16\u754C";
             float endY = page.DrawText(longText, 50, 50, font, 14, width: 100);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_wrap_cjk");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-wrapped-cjk-text");
 
             // endY should be below 50 (text wrapped to multiple lines)
             Assert.True(endY > 70, $"CJK text should wrap; endY={endY}");
@@ -278,6 +268,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: CJK text renders correctly in table cells");
 
             var table = new PdfTable(200, 200);
             table.SetHeaders("\u540D\u524D", "\u5024"); // 名前, 値
@@ -287,11 +278,11 @@ namespace SimpleTinyPDF.Tests
 
             page.DrawTable(table, 50, 50);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_table_cjk");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-cjk-in-table");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_table_cjk");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(50), PtToPx(120)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-cjk-in-table");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(50), TestHelper.PtToPx(120)),
                 "CJK table should render visible content");
             bitmap.Dispose();
         }
@@ -340,6 +331,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: CJK text in nested bullet lists");
 
             var items = new[]
             {
@@ -357,11 +349,11 @@ namespace SimpleTinyPDF.Tests
 
             var (lastPage, endY) = page.DrawList(items, 50, 50, 400, font: font, fontSize: 14);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_nested_list_cjk");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-nested-list-cjk");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_nested_list_cjk");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(40), PtToPx(200)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-nested-list-cjk");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(40), TestHelper.PtToPx(200)),
                 "CJK nested bullet list should render visible content");
             Assert.True(endY > 100, $"List should span multiple lines; endY={endY}");
             bitmap.Dispose();
@@ -373,6 +365,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: CJK text in nested numbered lists");
 
             var items = new[]
             {
@@ -388,11 +381,11 @@ namespace SimpleTinyPDF.Tests
             var (lastPage, endY) = page.DrawList(items, 50, 50, 400,
                 style: ListStyle.Numbered, font: font, fontSize: 14);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_nested_list_numbered");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-nested-list-numbered");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_nested_list_numbered");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(40), PtToPx(200)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-nested-list-numbered");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(40), TestHelper.PtToPx(200)),
                 "CJK numbered nested list should render visible content");
             bitmap.Dispose();
         }
@@ -403,6 +396,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(RobotoFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Cyrillic text in nested lists");
 
             var items = new[]
             {
@@ -416,11 +410,11 @@ namespace SimpleTinyPDF.Tests
 
             var (lastPage, endY) = page.DrawList(items, 50, 50, 400, font: font, fontSize: 12);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_nested_list_cyrillic");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-nested-list-cyrillic");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_nested_list_cyrillic");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(40), PtToPx(180)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-nested-list-cyrillic");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(40), TestHelper.PtToPx(180)),
                 "Cyrillic nested list should render visible content");
             bitmap.Dispose();
         }
@@ -432,6 +426,7 @@ namespace SimpleTinyPDF.Tests
             var roboto = PdfFontSource.FromFile(RobotoFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: mixed Unicode scripts in nested lists");
 
             // Top-level uses CJK font with numbered style
             // Mix: draw the list with CJK font, then a second with Cyrillic
@@ -458,16 +453,16 @@ namespace SimpleTinyPDF.Tests
                 style: ListStyle.Numbered, font: roboto, fontSize: 13);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_nested_list_mixed");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-nested-list-mixed");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_nested_list_mixed");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-nested-list-mixed");
             // CJK section
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(40), PtToPx(130)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(40), TestHelper.PtToPx(130)),
                 "CJK list section should render");
             // Cyrillic section (below CJK)
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(140), PtToPx(250)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(140), TestHelper.PtToPx(250)),
                 "Cyrillic list section should render");
             bitmap.Dispose();
         }
@@ -478,6 +473,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Unicode nested list text wraps correctly");
 
             // Long CJK text items that should wrap in a narrow width
             var items = new[]
@@ -489,7 +485,7 @@ namespace SimpleTinyPDF.Tests
 
             var (lastPage, endY) = page.DrawList(items, 50, 50, 150, font: font, fontSize: 14);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_nested_list_wrap");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-nested-list-wrapped");
 
             // With 150pt width and 14pt CJK text, items should wrap
             Assert.True(endY > 120, $"CJK list items should wrap in narrow width; endY={endY}");
@@ -504,15 +500,16 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: supplementary plane CJK Extension B characters render");
             string text = "\U0002000B\U00020089\U000200A2"; // 3 CJK Ext B chars
             page.DrawText(text, 50, 50, font: font, fontSize: 24);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_supp_cjk_ext_b");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-supplementary-cjk-ext-b");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_supp_cjk_ext_b");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(200), PtToPx(35), PtToPx(65)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-supplementary-cjk-ext-b");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(200), TestHelper.PtToPx(35), TestHelper.PtToPx(65)),
                 "CJK Extension B characters should render visible content");
             bitmap.Dispose();
         }
@@ -533,16 +530,17 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: mix of BMP and supplementary plane characters");
             // Mix BMP CJK (日本) + supplementary CJK Ext B (U+2000B) + BMP Latin (ABC)
             string text = "\u65E5\u672C\U0002000BABC";
             page.DrawText(text, 50, 50, font: font, fontSize: 18);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_supp_mixed_bmp");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-supplementary-mixed-bmp");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_supp_mixed_bmp");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(250), PtToPx(35), PtToPx(65)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-supplementary-mixed-bmp");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(250), TestHelper.PtToPx(35), TestHelper.PtToPx(65)),
                 "Mixed BMP + supplementary text should render");
             bitmap.Dispose();
         }
@@ -570,6 +568,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: supplementary plane characters in table cells");
 
             var table = new PdfTable(200, 200);
             table.HeaderFont = font;
@@ -579,11 +578,11 @@ namespace SimpleTinyPDF.Tests
 
             page.DrawTable(table, 50, 50, 400);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_supp_table");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-supplementary-table");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_supp_table");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(40), PtToPx(120)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-supplementary-table");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(40), TestHelper.PtToPx(120)),
                 "Table with supplementary characters should render");
             bitmap.Dispose();
         }
@@ -594,6 +593,7 @@ namespace SimpleTinyPDF.Tests
             var font = PdfFontSource.FromFile(CjkFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: supplementary plane characters in lists");
 
             var items = new[]
             {
@@ -604,11 +604,11 @@ namespace SimpleTinyPDF.Tests
 
             var (lastPage, endY) = page.DrawList(items, 50, 50, 400, font: font, fontSize: 14);
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_supp_list");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-supplementary-list");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_supp_list");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(40), PtToPx(150)),
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-supplementary-list");
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(40), TestHelper.PtToPx(150)),
                 "List with supplementary characters should render");
             bitmap.Dispose();
         }
@@ -639,6 +639,7 @@ namespace SimpleTinyPDF.Tests
             var roboto = PdfFontSource.FromFile(RobotoFontPath);
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: comprehensive showcase of Unicode support across all features");
 
             float y = 50;
             page.DrawText("Unicode Font Support Showcase", 50, y, PdfFont.HelveticaBold, 20);
@@ -673,15 +674,15 @@ namespace SimpleTinyPDF.Tests
             }, 50, y);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "unicode_showcase");
+            TestHelper.SavePdf(bytes, "Fonts/unicode-full-showcase");
 
-            var bitmap = TestHelper.RasterizePage(bytes, "unicode_showcase");
+            var bitmap = TestHelper.RasterizePage(bytes, "Fonts/unicode-full-showcase");
             // Verify multiple regions have content
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(40), PtToPx(60)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(40), TestHelper.PtToPx(60)),
                 "Title should render");
-            Assert.True(HasDarkPixelsInRegion(bitmap,
-                PtToPx(50), PtToPx(400), PtToPx(80), PtToPx(200)),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bitmap,
+                TestHelper.PtToPx(50), TestHelper.PtToPx(400), TestHelper.PtToPx(80), TestHelper.PtToPx(200)),
                 "Multi-script text should render");
             bitmap.Dispose();
         }

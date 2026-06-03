@@ -242,6 +242,7 @@ namespace SimpleTinyPDF.Tests
 
             // Go back to page 1 via GetPage and draw on it
             var page1 = doc.GetPage(1);
+            TestHelper.AddDescription(page1, "Verify: pages can be navigated and retrieved by index");
             page1.DrawText("Added later to page 1", 50, 50);
 
             // Draw on page 3
@@ -250,11 +251,11 @@ namespace SimpleTinyPDF.Tests
 
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "page_navigation_roundtrip");
+            TestHelper.SavePdf(bytes, "Document/page-navigation-roundtrip");
             Assert.Equal(3, TestHelper.GetPageCount(bytes));
 
             // Verify page 1 has content
-            var bitmap = TestHelper.RasterizePage(bytes, "page_navigation_roundtrip", 0);
+            var bitmap = TestHelper.RasterizePage(bytes, "Document/page-navigation-roundtrip", 0);
             Assert.True(bitmap.Width > 0);
             bitmap.Dispose();
         }
@@ -264,6 +265,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page1 = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page1, "Verify: pages can be inserted at specific positions");
             page1.DrawText("Original page 1", 50, 50);
 
             var page2 = doc.AddPage(PageSize.A4);
@@ -275,7 +277,7 @@ namespace SimpleTinyPDF.Tests
 
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "insert_page_roundtrip");
+            TestHelper.SavePdf(bytes, "Document/insert-page-roundtrip");
             Assert.Equal(3, TestHelper.GetPageCount(bytes));
         }
     }

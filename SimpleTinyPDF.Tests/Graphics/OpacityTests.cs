@@ -5,23 +5,6 @@ namespace SimpleTinyPDF.Tests
 {
     public class OpacityTests
     {
-        private static int PtToPx(float pt, int dpi = 150) => (int)(pt * dpi / 72.0);
-
-        private static bool HasDarkPixelsInRegion(SKBitmap bitmap,
-            int xMin, int xMax, int yMin, int yMax)
-        {
-            xMax = System.Math.Min(xMax, bitmap.Width - 1);
-            yMax = System.Math.Min(yMax, bitmap.Height - 1);
-            for (int x = xMin; x <= xMax; x++)
-                for (int y = yMin; y <= yMax; y++)
-                {
-                    var p = bitmap.GetPixel(x, y);
-                    if (p.Red < 200 || p.Green < 200 || p.Blue < 200)
-                        return true;
-                }
-            return false;
-        }
-
         /// <summary>
         /// Finds the darkest pixel value (lowest R channel) in a region.
         /// For black text on white: fully opaque → near 0, semi-transparent → blended toward 255.
@@ -47,23 +30,25 @@ namespace SimpleTinyPDF.Tests
             // Render fully opaque black text
             var doc1 = new PdfDocument();
             var page1 = doc1.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page1, "Verify: text at 100% opacity is fully visible");
             page1.DrawText("OPACITY", 50, 50, PdfFont.Helvetica, 48);
             var bytes1 = doc1.ToArray();
-            TestHelper.SavePdf(bytes1, "opacity_text_full");
-            var bmp1 = TestHelper.RasterizePage(bytes1, "opacity_text_full");
+            TestHelper.SavePdf(bytes1, "Graphics/opacity-text-100pct");
+            var bmp1 = TestHelper.RasterizePage(bytes1, "Graphics/opacity-text-100pct");
 
             // Render half-opacity black text
             var doc2 = new PdfDocument();
             var page2 = doc2.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page2, "Verify: text at 50% opacity is semi-transparent");
             page2.DrawText("OPACITY", 50, 50, PdfFont.Helvetica, 48, opacity: 0.5f);
             var bytes2 = doc2.ToArray();
-            TestHelper.SavePdf(bytes2, "opacity_text_half");
-            var bmp2 = TestHelper.RasterizePage(bytes2, "opacity_text_half");
+            TestHelper.SavePdf(bytes2, "Graphics/opacity-text-50pct");
+            var bmp2 = TestHelper.RasterizePage(bytes2, "Graphics/opacity-text-50pct");
 
-            int yMin = PtToPx(50);
-            int yMax = PtToPx(50 + 48);
-            int xMin = PtToPx(50);
-            int xMax = PtToPx(250);
+            int yMin = TestHelper.PtToPx(50);
+            int yMax = TestHelper.PtToPx(50 + 48);
+            int xMin = TestHelper.PtToPx(50);
+            int xMax = TestHelper.PtToPx(250);
 
             byte darkestFull = DarkestRedInRegion(bmp1, xMin, xMax, yMin, yMax);
             byte darkestHalf = DarkestRedInRegion(bmp2, xMin, xMax, yMin, yMax);
@@ -82,24 +67,26 @@ namespace SimpleTinyPDF.Tests
             // Default (no opacity parameter)
             var doc1 = new PdfDocument();
             var page1 = doc1.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page1, "Verify: default opacity text is fully visible");
             page1.DrawText("Test", 50, 50, PdfFont.Helvetica, 24);
             var bytes1 = doc1.ToArray();
 
             // Explicit opacity=1.0
             var doc2 = new PdfDocument();
             var page2 = doc2.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page2, "Verify: explicitly set 100% opacity matches default");
             page2.DrawText("Test", 50, 50, PdfFont.Helvetica, 24, opacity: 1f);
             var bytes2 = doc2.ToArray();
 
-            TestHelper.SavePdf(bytes1, "opacity_text_default");
-            TestHelper.SavePdf(bytes2, "opacity_text_explicit_full");
-            var bmp1 = TestHelper.RasterizePage(bytes1, "opacity_text_default");
-            var bmp2 = TestHelper.RasterizePage(bytes2, "opacity_text_explicit_full");
+            TestHelper.SavePdf(bytes1, "Graphics/opacity-text-default");
+            TestHelper.SavePdf(bytes2, "Graphics/opacity-text-explicit-100pct");
+            var bmp1 = TestHelper.RasterizePage(bytes1, "Graphics/opacity-text-default");
+            var bmp2 = TestHelper.RasterizePage(bytes2, "Graphics/opacity-text-explicit-100pct");
 
-            int yMin = PtToPx(50);
-            int yMax = PtToPx(74);
-            int xMin = PtToPx(50);
-            int xMax = PtToPx(150);
+            int yMin = TestHelper.PtToPx(50);
+            int yMax = TestHelper.PtToPx(74);
+            int xMin = TestHelper.PtToPx(50);
+            int xMax = TestHelper.PtToPx(150);
 
             byte darkest1 = DarkestRedInRegion(bmp1, xMin, xMax, yMin, yMax);
             byte darkest2 = DarkestRedInRegion(bmp2, xMin, xMax, yMin, yMax);
@@ -117,24 +104,26 @@ namespace SimpleTinyPDF.Tests
         {
             var doc1 = new PdfDocument();
             var page1 = doc1.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page1, "Verify: textbox at 100% opacity is fully visible");
             page1.DrawText("Semi transparent text box content here", 50, 50,
                 PdfFont.Helvetica, 24, width: 300);
             var bytes1 = doc1.ToArray();
-            TestHelper.SavePdf(bytes1, "opacity_textbox_full");
-            var bmp1 = TestHelper.RasterizePage(bytes1, "opacity_textbox_full");
+            TestHelper.SavePdf(bytes1, "Graphics/opacity-textbox-100pct");
+            var bmp1 = TestHelper.RasterizePage(bytes1, "Graphics/opacity-textbox-100pct");
 
             var doc2 = new PdfDocument();
             var page2 = doc2.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page2, "Verify: textbox at 30% opacity is very transparent");
             page2.DrawText("Semi transparent text box content here", 50, 50,
                 PdfFont.Helvetica, 24, opacity: 0.3f, width: 300);
             var bytes2 = doc2.ToArray();
-            TestHelper.SavePdf(bytes2, "opacity_textbox_030");
-            var bmp2 = TestHelper.RasterizePage(bytes2, "opacity_textbox_030");
+            TestHelper.SavePdf(bytes2, "Graphics/opacity-textbox-30pct");
+            var bmp2 = TestHelper.RasterizePage(bytes2, "Graphics/opacity-textbox-30pct");
 
-            int yMin = PtToPx(50);
-            int yMax = PtToPx(100);
-            int xMin = PtToPx(50);
-            int xMax = PtToPx(300);
+            int yMin = TestHelper.PtToPx(50);
+            int yMax = TestHelper.PtToPx(100);
+            int xMin = TestHelper.PtToPx(50);
+            int xMax = TestHelper.PtToPx(300);
 
             byte darkestFull = DarkestRedInRegion(bmp1, xMin, xMax, yMin, yMax);
             byte darkestPartial = DarkestRedInRegion(bmp2, xMin, xMax, yMin, yMax);
@@ -175,25 +164,27 @@ namespace SimpleTinyPDF.Tests
             var doc1 = new PdfDocument();
             doc1.AddImage(image);
             var page1 = doc1.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page1, "Verify: image at 100% opacity is fully visible");
             page1.DrawImage(image, 50, 50, 200, 200);
             var bytes1 = doc1.ToArray();
-            TestHelper.SavePdf(bytes1, "opacity_image_full");
-            var bmp1 = TestHelper.RasterizePage(bytes1, "opacity_image_full");
+            TestHelper.SavePdf(bytes1, "Graphics/opacity-image-100pct");
+            var bmp1 = TestHelper.RasterizePage(bytes1, "Graphics/opacity-image-100pct");
 
             // Half opacity
             var doc2 = new PdfDocument();
             doc2.AddImage(image);
             var page2 = doc2.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page2, "Verify: image at 50% opacity is semi-transparent");
             page2.DrawImage(image, 50, 50, 200, 200, opacity: 0.5f);
             var bytes2 = doc2.ToArray();
-            TestHelper.SavePdf(bytes2, "opacity_image_half");
-            var bmp2 = TestHelper.RasterizePage(bytes2, "opacity_image_half");
+            TestHelper.SavePdf(bytes2, "Graphics/opacity-image-50pct");
+            var bmp2 = TestHelper.RasterizePage(bytes2, "Graphics/opacity-image-50pct");
 
             // Check a region in the center of the image
-            int xMin = PtToPx(100);
-            int xMax = PtToPx(200);
-            int yMin = PtToPx(100);
-            int yMax = PtToPx(200);
+            int xMin = TestHelper.PtToPx(100);
+            int xMax = TestHelper.PtToPx(200);
+            int yMin = TestHelper.PtToPx(100);
+            int yMax = TestHelper.PtToPx(200);
 
             // For a red image: full opacity has G near 0, half opacity has G blended toward white
             byte greenFull = DarkestGreenInRegion(bmp1, xMin, xMax, yMin, yMax);
@@ -214,32 +205,34 @@ namespace SimpleTinyPDF.Tests
             // Render with second span at full opacity as baseline
             var doc1 = new PdfDocument();
             var page1 = doc1.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page1, "Verify: rich text at 100% opacity is fully visible");
             page1.DrawText(new[]
             {
                 new TextSpan("AA ", PdfFont.Helvetica, 36, PdfColor.Black, opacity: 1f),
                 new TextSpan("BB", PdfFont.Helvetica, 36, PdfColor.Black, opacity: 1f)
             }, 50, 50);
             var bytes1 = doc1.ToArray();
-            TestHelper.SavePdf(bytes1, "opacity_richtext_allFull");
-            var bmp1 = TestHelper.RasterizePage(bytes1, "opacity_richtext_allFull");
+            TestHelper.SavePdf(bytes1, "Graphics/opacity-richtext-100pct");
+            var bmp1 = TestHelper.RasterizePage(bytes1, "Graphics/opacity-richtext-100pct");
 
             // Render with second span at half opacity
             var doc2 = new PdfDocument();
             var page2 = doc2.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page2, "Verify: rich text spans with different opacities");
             page2.DrawText(new[]
             {
                 new TextSpan("AA ", PdfFont.Helvetica, 36, PdfColor.Black, opacity: 1f),
                 new TextSpan("BB", PdfFont.Helvetica, 36, PdfColor.Black, opacity: 0.5f)
             }, 50, 50);
             var bytes2 = doc2.ToArray();
-            TestHelper.SavePdf(bytes2, "opacity_richtext_mixed");
-            var bmp2 = TestHelper.RasterizePage(bytes2, "opacity_richtext_mixed");
+            TestHelper.SavePdf(bytes2, "Graphics/opacity-richtext-mixed");
+            var bmp2 = TestHelper.RasterizePage(bytes2, "Graphics/opacity-richtext-mixed");
 
-            int yMin = PtToPx(50);
-            int yMax = PtToPx(86);
+            int yMin = TestHelper.PtToPx(50);
+            int yMax = TestHelper.PtToPx(86);
             // "AA " at 36pt is ~80pt wide. "BB" region starts around x=130pt
-            int xBBMin = PtToPx(130);
-            int xBBMax = PtToPx(200);
+            int xBBMin = TestHelper.PtToPx(130);
+            int xBBMax = TestHelper.PtToPx(200);
 
             byte darkestAllFull = DarkestRedInRegion(bmp1, xBBMin, xBBMax, yMin, yMax);
             byte darkestHalfOpacity = DarkestRedInRegion(bmp2, xBBMin, xBBMax, yMin, yMax);
@@ -258,6 +251,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: rich textbox with mixed opacity spans");
 
             var spans = new[]
             {
@@ -267,13 +261,13 @@ namespace SimpleTinyPDF.Tests
             page.DrawText(spans, 50, 50, width: 300);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "opacity_richtextbox");
-            var bmp = TestHelper.RasterizePage(bytes, "opacity_richtextbox");
+            TestHelper.SavePdf(bytes, "Graphics/opacity-richtextbox-mixed");
+            var bmp = TestHelper.RasterizePage(bytes, "Graphics/opacity-richtextbox-mixed");
 
-            int yMin = PtToPx(50);
-            int yMax = PtToPx(70);
+            int yMin = TestHelper.PtToPx(50);
+            int yMax = TestHelper.PtToPx(70);
 
-            Assert.True(HasDarkPixelsInRegion(bmp, PtToPx(50), PtToPx(300), yMin, yMax),
+            Assert.True(TestHelper.HasDarkPixelsInRegion(bmp, TestHelper.PtToPx(50), TestHelper.PtToPx(300), yMin, yMax),
                 "Rich text box with opacity should have visible content");
 
             bmp.Dispose();
@@ -284,17 +278,18 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: text at 0% opacity is invisible");
             page.DrawText("INVISIBLE", 50, 50, PdfFont.Helvetica, 48, opacity: 0f);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "opacity_text_zero");
-            var bmp = TestHelper.RasterizePage(bytes, "opacity_text_zero");
+            TestHelper.SavePdf(bytes, "Graphics/opacity-text-0pct-invisible");
+            var bmp = TestHelper.RasterizePage(bytes, "Graphics/opacity-text-0pct-invisible");
 
-            int yMin = PtToPx(50);
-            int yMax = PtToPx(98);
+            int yMin = TestHelper.PtToPx(50);
+            int yMax = TestHelper.PtToPx(98);
 
             // Zero opacity text should be invisible — all pixels should be white
-            Assert.False(HasDarkPixelsInRegion(bmp, PtToPx(50), PtToPx(300), yMin, yMax),
+            Assert.False(TestHelper.HasDarkPixelsInRegion(bmp, TestHelper.PtToPx(50), TestHelper.PtToPx(300), yMin, yMax),
                 "Zero opacity text should be invisible");
 
             bmp.Dispose();

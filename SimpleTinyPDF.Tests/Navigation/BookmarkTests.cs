@@ -1,14 +1,10 @@
 using System;
-using System.Text;
 using Xunit;
 
 namespace SimpleTinyPDF.Tests
 {
     public class BookmarkTests
     {
-        private static string GetPdfText(byte[] bytes) =>
-            Encoding.ASCII.GetString(bytes);
-
         [Fact]
         public void AddBookmark_NullTitle_Throws()
         {
@@ -37,7 +33,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             doc.AddPage();
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
             Assert.DoesNotContain("/Outlines", pdf);
             Assert.DoesNotContain("/Type /Outlines", pdf);
         }
@@ -48,7 +44,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage();
             doc.AddBookmark("Chapter 1", page);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Type /Outlines", pdf);
             Assert.Contains("/Outlines", pdf);
@@ -62,7 +58,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage();
             doc.AddBookmark("Section", page, 200);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/XYZ", pdf);
         }
@@ -77,7 +73,7 @@ namespace SimpleTinyPDF.Tests
             ch1.AddBookmark("Section 1.2", page, 400);
             doc.AddBookmark("Chapter 2", page);
 
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
             Assert.Contains("Chapter 1", pdf);
             Assert.Contains("Section 1.1", pdf);
             Assert.Contains("Section 1.2", pdf);
@@ -96,7 +92,7 @@ namespace SimpleTinyPDF.Tests
             doc.AddBookmark("B", page);
             doc.AddBookmark("C", page);
 
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
             Assert.Contains("/Next", pdf);
             Assert.Contains("/Prev", pdf);
         }
@@ -121,7 +117,7 @@ namespace SimpleTinyPDF.Tests
             page.CoordinateOrigin = CoordinateOrigin.BottomUp;
             doc.AddBookmark("Bottom Up Section", page, 500);
 
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
             Assert.Contains("/XYZ 0 500 0", pdf);
         }
 
@@ -132,7 +128,7 @@ namespace SimpleTinyPDF.Tests
             var page = doc.AddPage(PageSize.A4); // height = 842
             doc.AddBookmark("Top Down Section", page, 100);
 
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
             // pdfY = 842 - 100 = 742
             Assert.Contains("/XYZ 0 742 0", pdf);
         }
@@ -178,6 +174,9 @@ namespace SimpleTinyPDF.Tests
                     50, 530, PdfFont.Helvetica, 11, width: 495, lineSpacing: 1.4f);
             }
 
+            // Description on first page
+            TestHelper.AddDescription(pages[0], "Verify: hierarchical bookmarks across multiple pages");
+
             // Build bookmark hierarchy with nested sections
             // Chapter 1: Introduction (with sub-sections)
             var intro = doc.AddBookmark("Introduction", pages[0]);
@@ -210,7 +209,7 @@ namespace SimpleTinyPDF.Tests
             appendix.AddBookmark("Index", pages[9], 300);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "bookmarks_multipage");
+            TestHelper.SavePdf(bytes, "Navigation/bookmarks-multipage-hierarchy");
 
             // Verify page count
             Assert.Equal(10, TestHelper.GetPageCount(bytes));
@@ -218,13 +217,13 @@ namespace SimpleTinyPDF.Tests
             // Verify all pages rasterize
             for (int i = 0; i < 10; i++)
             {
-                var bitmap = TestHelper.RasterizePage(bytes, "bookmarks_multipage", i);
+                var bitmap = TestHelper.RasterizePage(bytes, "Navigation/bookmarks-multipage-hierarchy", i);
                 Assert.True(bitmap.Width > 0);
                 bitmap.Dispose();
             }
 
             // Verify bookmark structure in PDF output
-            var pdf = GetPdfText(bytes);
+            var pdf = TestHelper.GetPdfText(bytes);
             Assert.Contains("/Type /Outlines", pdf);
             foreach (var title in chapterTitles)
                 Assert.Contains(title, pdf);

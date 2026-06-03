@@ -1,13 +1,9 @@
-using System.Text;
 using Xunit;
 
 namespace SimpleTinyPDF.Tests
 {
     public class HyperlinkTests
     {
-        private static string GetPdfText(byte[] bytes) =>
-            Encoding.ASCII.GetString(bytes);
-
         // ── TextSpan.Link ────────────────────────────────────────
 
         [Fact]
@@ -43,7 +39,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.DrawText("Click here", 50, 50, link: "https://example.com");
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
             Assert.Contains("/Subtype /Link", pdf);
@@ -58,7 +54,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.DrawText("No link", 50, 50);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.DoesNotContain("/Annots", pdf);
         }
@@ -69,7 +65,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.DrawText("Click", 50, 50, link: "https://example.com");
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Rect", pdf);
         }
@@ -80,7 +76,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.DrawText("Click", 50, 50, link: "https://example.com/path?a=1&b=(2)");
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("https://example.com/path?a=1&b=\\(2\\)", pdf);
         }
@@ -90,12 +86,13 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: clickable hyperlink on drawn text");
             page.DrawText("Visit site", 50, 50, PdfFont.Helvetica, 12,
                 PdfColor.Blue, underline: true, link: "https://example.com");
             var bytes = doc.ToArray();
 
-            TestHelper.SavePdf(bytes, "link_drawtext");
-            var bitmap = TestHelper.RasterizePage(bytes, "link_drawtext");
+            TestHelper.SavePdf(bytes, "Navigation/hyperlink-on-drawtext");
+            var bitmap = TestHelper.RasterizePage(bytes, "Navigation/hyperlink-on-drawtext");
             Assert.True(bitmap.Width > 0);
             bitmap.Dispose();
         }
@@ -114,7 +111,7 @@ namespace SimpleTinyPDF.Tests
                     underline: true, link: "https://docs.example.com"),
                 new TextSpan(" for info.")
             }, 50, 50);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
             Assert.Contains("https://docs.example.com", pdf);
@@ -131,7 +128,7 @@ namespace SimpleTinyPDF.Tests
                 new TextSpan(" "),
                 new TextSpan("Link2", link: "https://two.com")
             }, 50, 50);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("https://one.com", pdf);
             Assert.Contains("https://two.com", pdf);
@@ -147,7 +144,7 @@ namespace SimpleTinyPDF.Tests
                 new TextSpan("Hello "),
                 new TextSpan("world")
             }, 50, 50);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.DoesNotContain("/Annots", pdf);
         }
@@ -161,7 +158,7 @@ namespace SimpleTinyPDF.Tests
             var page = doc.AddPage(PageSize.A4);
             page.DrawText("Click here for details", 50, 50,
                 link: "https://example.com", width: 200);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
             Assert.Contains("https://example.com", pdf);
@@ -176,7 +173,7 @@ namespace SimpleTinyPDF.Tests
             page.DrawText(
                 "This is a long text that should wrap across multiple lines in the text box",
                 50, 50, PdfFont.Helvetica, 12, link: "https://example.com", width: 80);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
             // Count annotation objects — should have more than one /Subtype /Link
@@ -196,7 +193,7 @@ namespace SimpleTinyPDF.Tests
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
             page.DrawText("No link text", 50, 50, width: 200);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.DoesNotContain("/Annots", pdf);
         }
@@ -215,7 +212,7 @@ namespace SimpleTinyPDF.Tests
                     underline: true, link: "https://docs.example.com"),
                 new TextSpan(" for more.")
             }, 50, 50, width: 400);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
             Assert.Contains("https://docs.example.com", pdf);
@@ -232,7 +229,7 @@ namespace SimpleTinyPDF.Tests
                 new TextSpan("linked text", link: "https://example.com"),
                 new TextSpan(" more normal text")
             }, 50, 50, width: 400);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("https://example.com", pdf);
             // Should only have one link annotation
@@ -257,7 +254,7 @@ namespace SimpleTinyPDF.Tests
                 new TextSpan("This linked text should wrap across lines", PdfFont.Helvetica, 12,
                     PdfColor.Blue, underline: true, link: "https://example.com")
             }, 50, 50, width: 100);
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("https://example.com", pdf);
             int count = 0;
@@ -279,7 +276,7 @@ namespace SimpleTinyPDF.Tests
             var page = doc.AddPage(PageSize.A4);
             page.CoordinateOrigin = CoordinateOrigin.BottomUp;
             page.DrawText("Click", 50, 700, link: "https://example.com");
-            var pdf = GetPdfText(doc.ToArray());
+            var pdf = TestHelper.GetPdfText(doc.ToArray());
 
             Assert.Contains("/Annots", pdf);
             Assert.Contains("https://example.com", pdf);
@@ -292,6 +289,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: multiple hyperlinks inline with plain text");
 
             // DrawText with link
             page.DrawText("Visit Example", 50, 50, PdfFont.Helvetica, 14,
@@ -323,12 +321,12 @@ namespace SimpleTinyPDF.Tests
             }, 50, 180, width: 300);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "links_mixed");
-            var bitmap = TestHelper.RasterizePage(bytes, "links_mixed");
+            TestHelper.SavePdf(bytes, "Navigation/hyperlinks-mixed-inline");
+            var bitmap = TestHelper.RasterizePage(bytes, "Navigation/hyperlinks-mixed-inline");
             Assert.True(bitmap.Width > 0);
             bitmap.Dispose();
 
-            var pdf = GetPdfText(bytes);
+            var pdf = TestHelper.GetPdfText(bytes);
             Assert.Contains("https://example.com", pdf);
             Assert.Contains("https://github.com", pdf);
             Assert.Contains("https://example.com/terms", pdf);

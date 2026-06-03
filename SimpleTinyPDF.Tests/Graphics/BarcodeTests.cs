@@ -5,8 +5,6 @@ namespace SimpleTinyPDF.Tests
 {
     public class BarcodeTests
     {
-        private static int PtToPx(float pt, int dpi = 150) => (int)(pt * dpi / 72.0);
-
         // ── Code 39 Encoder Tests ───────────────────────────────────
 
         [Fact]
@@ -207,11 +205,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Code39 barcode renders visible bars");
             page.DrawBarcode("HELLO", BarcodeType.Code39, 50, 100, 300, 80);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "barcode_code39");
-            var bitmap = TestHelper.RasterizePage(bytes, "barcode_code39");
+            TestHelper.SavePdf(bytes, "Graphics/barcode-code39-hello");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/barcode-code39-hello");
 
             AssertHasDarkAndLightPixels(bitmap, 50, 350, 100, 180, "Code 39");
             bitmap.Dispose();
@@ -222,11 +221,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: EAN-13 barcode renders visible bars");
             page.DrawBarcode("978020137962", BarcodeType.Ean13, 50, 100, 200, 80);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "barcode_ean13");
-            var bitmap = TestHelper.RasterizePage(bytes, "barcode_ean13");
+            TestHelper.SavePdf(bytes, "Graphics/barcode-ean13-product");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/barcode-ean13-product");
 
             AssertHasDarkAndLightPixels(bitmap, 50, 250, 100, 180, "EAN-13");
             bitmap.Dispose();
@@ -237,11 +237,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: UPC-A barcode renders visible bars");
             page.DrawBarcode("03600029145", BarcodeType.UpcA, 50, 100, 200, 80);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "barcode_upca");
-            var bitmap = TestHelper.RasterizePage(bytes, "barcode_upca");
+            TestHelper.SavePdf(bytes, "Graphics/barcode-upca-product");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/barcode-upca-product");
 
             AssertHasDarkAndLightPixels(bitmap, 50, 250, 100, 180, "UPC-A");
             bitmap.Dispose();
@@ -252,11 +253,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Code128 barcode renders visible bars");
             page.DrawBarcode("Hello123", BarcodeType.Code128, 50, 100, 300, 80);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "barcode_code128");
-            var bitmap = TestHelper.RasterizePage(bytes, "barcode_code128");
+            TestHelper.SavePdf(bytes, "Graphics/barcode-code128-alphanumeric");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/barcode-code128-alphanumeric");
 
             AssertHasDarkAndLightPixels(bitmap, 50, 350, 100, 180, "Code 128");
             bitmap.Dispose();
@@ -267,11 +269,12 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: QR code renders visible module grid");
             page.DrawBarcode("https://example.com", BarcodeType.QrCode, 50, 100, 200, 200);
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "barcode_qrcode");
-            var bitmap = TestHelper.RasterizePage(bytes, "barcode_qrcode");
+            TestHelper.SavePdf(bytes, "Graphics/barcode-qrcode-url");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/barcode-qrcode-url");
 
             AssertHasDarkAndLightPixels(bitmap, 50, 250, 100, 300, "QR Code");
             bitmap.Dispose();
@@ -282,12 +285,13 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: QR code with high error correction renders larger grid");
             page.DrawBarcode("https://example.com", BarcodeType.QrCode, 50, 100, 200, 200,
                 new BarcodeOptions { QrErrorCorrectionLevel = QrErrorCorrection.High });
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "barcode_qrcode_high_ec");
-            var bitmap = TestHelper.RasterizePage(bytes, "barcode_qrcode_high_ec");
+            TestHelper.SavePdf(bytes, "Graphics/barcode-qrcode-high-ec");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/barcode-qrcode-high-ec");
 
             AssertHasDarkAndLightPixels(bitmap, 50, 250, 100, 300, "QR Code High EC");
             bitmap.Dispose();
@@ -298,17 +302,18 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Code39 barcode renders in blue color");
             page.DrawBarcode("TEST", BarcodeType.Code39, 50, 100, 300, 80,
                 new BarcodeOptions { ForegroundColor = PdfColor.Blue });
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "barcode_code39_blue");
-            var bitmap = TestHelper.RasterizePage(bytes, "barcode_code39_blue");
+            TestHelper.SavePdf(bytes, "Graphics/barcode-code39-blue");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/barcode-code39-blue");
 
             // Should have blue pixels in the barcode area
             int blueCount = 0;
-            int midY = PtToPx(140);
-            for (int px = PtToPx(60); px < PtToPx(340); px++)
+            int midY = TestHelper.PtToPx(140);
+            for (int px = TestHelper.PtToPx(60); px < TestHelper.PtToPx(340); px++)
             {
                 var pixel = bitmap.GetPixel(px, midY);
                 if (pixel.Blue > 150 && pixel.Red < 100 && pixel.Green < 100)
@@ -323,12 +328,13 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: Code39 barcode with text label below bars");
             page.DrawBarcode("HELLO", BarcodeType.Code39, 50, 100, 300, 80,
                 new BarcodeOptions { ShowText = true });
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "barcode_code39_text");
-            var bitmap = TestHelper.RasterizePage(bytes, "barcode_code39_text");
+            TestHelper.SavePdf(bytes, "Graphics/barcode-code39-with-label");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/barcode-code39-with-label");
 
             // Text should be at the bottom of the barcode area
             // Just verify the overall area has dark content (bars + text)
@@ -359,6 +365,7 @@ namespace SimpleTinyPDF.Tests
         {
             var doc = new PdfDocument();
             var page = doc.AddPage(PageSize.A4);
+            TestHelper.AddDescription(page, "Verify: all barcode types rendered on single page");
 
             page.DrawText("Barcode Types", 50, 30, PdfFont.HelveticaBold, 16);
 
@@ -382,8 +389,8 @@ namespace SimpleTinyPDF.Tests
                 new BarcodeOptions { QrErrorCorrectionLevel = QrErrorCorrection.High });
 
             var bytes = doc.ToArray();
-            TestHelper.SavePdf(bytes, "barcode_all_types");
-            var bitmap = TestHelper.RasterizePage(bytes, "barcode_all_types");
+            TestHelper.SavePdf(bytes, "Graphics/barcode-all-types-showcase");
+            var bitmap = TestHelper.RasterizePage(bytes, "Graphics/barcode-all-types-showcase");
 
             // Just verify it renders without crashing and has content
             Assert.True(bitmap.Width > 0);
@@ -396,9 +403,9 @@ namespace SimpleTinyPDF.Tests
         private void AssertHasDarkAndLightPixels(SkiaSharp.SKBitmap bitmap,
             float xMinPt, float xMaxPt, float yMinPt, float yMaxPt, string label)
         {
-            int xMin = PtToPx(xMinPt);
-            int xMax = Math.Min(PtToPx(xMaxPt), bitmap.Width - 1);
-            int yMid = PtToPx((yMinPt + yMaxPt) / 2);
+            int xMin = TestHelper.PtToPx(xMinPt);
+            int xMax = Math.Min(TestHelper.PtToPx(xMaxPt), bitmap.Width - 1);
+            int yMid = TestHelper.PtToPx((yMinPt + yMaxPt) / 2);
             if (yMid >= bitmap.Height) yMid = bitmap.Height / 2;
 
             int darkCount = 0, lightCount = 0;
