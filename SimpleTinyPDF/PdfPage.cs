@@ -190,8 +190,9 @@ namespace SimpleTinyPDF
         }
 
         /// <summary>Measures the width of a string in points for the given font and size.</summary>
-        public float MeasureText(string text, PdfFontSource font, float fontSize) =>
-            FontMetrics.MeasureString(text, font, fontSize);
+        public float MeasureText(string text, PdfFontSource font, float fontSize,
+            float characterSpacing = 0f) =>
+            FontMetrics.MeasureString(text, font, fontSize, characterSpacing);
 
         private void AppendUnderline(float x, float pdfY, float width, float fontSize, PdfColor color)
         {
@@ -199,6 +200,32 @@ namespace SimpleTinyPDF
             float ulH = 50f * fontSize / 1000f;
             AppendColorFill(color);
             _content.AppendFormat("{0} {1} {2} {3} re f\n", F(x), F(ulY), F(width), F(ulH));
+        }
+
+        private void AppendFauxBoldStart(float fontSize, PdfColor color)
+        {
+            _content.Append("2 Tr\n");
+            _content.AppendFormat("{0} w\n", F(fontSize * 0.025f));
+            AppendColorStroke(color);
+        }
+
+        private void AppendFauxBoldEnd()
+        {
+            _content.Append("0 Tr\n");
+        }
+
+        private void AppendTextMatrix(float x, float y, bool italic)
+        {
+            if (italic)
+            {
+                const float italicShear = 0.2126f; // tan(12 degrees)
+                _content.AppendFormat("{0} {1} {2} {3} {4} {5} Tm\n",
+                    F(1f), F(0f), F(italicShear), F(1f), F(x), F(y));
+            }
+            else
+            {
+                _content.AppendFormat("1 0 0 1 {0} {1} Tm\n", F(x), F(y));
+            }
         }
 
         // ── Text ──────────────────────────────────────────────────
@@ -212,17 +239,19 @@ namespace SimpleTinyPDF
             PdfColor? color = null, TextAlignment alignment = TextAlignment.Left,
             bool underline = false, float opacity = 1f,
             string link = null, float rotation = 0f,
-            float? width = null, float lineSpacing = 1.2f)
+            float? width = null, float lineSpacing = 1.2f,
+            float characterSpacing = 0f, bool bold = false, bool italic = false)
         {
             font = font ?? (PdfFontSource)PdfFont.Helvetica;
             if (string.IsNullOrEmpty(text)) return y;
 
             if (width.HasValue)
                 return DrawTextBoxCore(text, x, y, width.Value, font, fontSize,
-                    lineSpacing, color, alignment, underline, opacity, link, rotation);
+                    lineSpacing, color, alignment, underline, opacity, link, rotation,
+                    characterSpacing, bold, italic);
 
             DrawTextCore(text, x, y, font, fontSize, color, alignment,
-                underline, opacity, link, rotation);
+                underline, opacity, link, rotation, characterSpacing, bold, italic);
 
             bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;
             return topDown ? y + fontSize * lineSpacing : y - fontSize * lineSpacing;
@@ -268,10 +297,12 @@ namespace SimpleTinyPDF
             PdfFontSource font = null, float fontSize = 12f,
             float lineSpacing = 1.2f, PdfColor? color = null,
             TextAlignment alignment = TextAlignment.Left, bool underline = false,
-            float opacity = 1f, string link = null, float rotation = 0f)
+            float opacity = 1f, string link = null, float rotation = 0f,
+            float characterSpacing = 0f, bool bold = false, bool italic = false)
         {
             return DrawText(text, x, y, font, fontSize, color, alignment,
-                underline, opacity, link, rotation, width, lineSpacing);
+                underline, opacity, link, rotation, width, lineSpacing,
+                characterSpacing, bold, italic);
         }
 
         /// <summary>Draws a single line of mixed-format text.</summary>
@@ -295,18 +326,20 @@ namespace SimpleTinyPDF
             PdfFontSource font, float fontSize,
             PdfColor? color, TextAlignment alignment,
             bool underline, float opacity,
-            string link, float rotation)
+            string link, float rotation,
+            float characterSpacing = 0f, bool bold = false, bool italic = false)
         {
             var c = color ?? PdfColor.Black;
             var fontId = EnsureFont(font);
             float pdfY = CoordinateOrigin == CoordinateOrigin.TopDown
                 ? Height - y - fontSize : y;
 
+            float textWidth = MeasureText(text, font, fontSize, characterSpacing);
             float drawX = x;
             if (alignment == TextAlignment.Center)
-                drawX = x - MeasureText(text, font, fontSize) / 2f;
+                drawX = x - textWidth / 2f;
             else if (alignment == TextAlignment.Right)
-                drawX = x - MeasureText(text, font, fontSize);
+                drawX = x - textWidth;
 
             _content.Append("q\n");
             AppendOpacity(opacity);
@@ -314,13 +347,19 @@ namespace SimpleTinyPDF
             _content.Append("BT\n");
             _content.AppendFormat("/{0} {1} Tf\n", fontId, F(fontSize));
             AppendColorFill(c);
-            _content.AppendFormat("{0} {1} Td\n", F(drawX), F(pdfY));
+            if (bold) AppendFauxBoldStart(fontSize, c);
+            if (characterSpacing != 0f)
+                _content.AppendFormat("{0} Tc\n", F(characterSpacing));
+            AppendTextMatrix(drawX, pdfY, italic);
             _content.AppendFormat("{0} Tj\n", EncodeText(text, font));
+            if (bold) AppendFauxBoldEnd();
+            if (characterSpacing != 0f)
+                _content.Append("0 Tc\n");
             _content.Append("ET\n");
             if (underline)
-                AppendUnderline(drawX, pdfY, MeasureText(text, font, fontSize), fontSize, c);
+                AppendUnderline(drawX, pdfY, textWidth, fontSize, c);
             _content.Append("Q\n");
-            AddLinkAnnotation(link, drawX, pdfY, MeasureText(text, font, fontSize), fontSize);
+            AddLinkAnnotation(link, drawX, pdfY, textWidth, fontSize);
         }
 
         private void DrawRichTextCore(IReadOnlyList<TextSpan> spanList, float x, float y,
@@ -329,12 +368,14 @@ namespace SimpleTinyPDF
             float totalWidth = 0;
             float maxFontSize = 0;
             bool hasUnderline = false;
+            bool usePerSpanTm = false;
             foreach (var span in spanList)
             {
-                totalWidth += MeasureText(span.Text, span.Font, span.FontSize);
+                totalWidth += MeasureText(span.Text, span.Font, span.FontSize, span.CharacterSpacing);
                 if (span.FontSize > maxFontSize)
                     maxFontSize = span.FontSize;
                 if (span.Underline) hasUnderline = true;
+                if (span.Italic) usePerSpanTm = true;
             }
 
             float drawX = x;
@@ -349,12 +390,17 @@ namespace SimpleTinyPDF
             _content.Append("q\n");
             AppendRotation(rotation, x, pdfY);
             _content.Append("BT\n");
-            _content.AppendFormat("{0} {1} Td\n", F(drawX), F(pdfY));
+            if (usePerSpanTm)
+                AppendTextMatrix(drawX, pdfY, false);
+            else
+                _content.AppendFormat("{0} {1} Td\n", F(drawX), F(pdfY));
 
             PdfFontSource lastFont = null;
             float lastFontSize = -1;
             PdfColor? lastColor = null;
             float lastOpacity = -1f;
+            bool lastBold = false;
+            float lastCharSpacing = 0f;
 
             // Track span positions for underline and links
             List<(float x, float width, float fontSize, PdfColor color)> ulSpans = null;
@@ -371,7 +417,6 @@ namespace SimpleTinyPDF
                         AppendOpacity(span.Opacity);
                     else if (lastOpacity >= 0f && lastOpacity < 1f)
                     {
-                        // Reset to full opacity
                         var gsId = EnsureGraphicsState(1f);
                         _content.AppendFormat("/{0} gs\n", gsId);
                     }
@@ -392,7 +437,32 @@ namespace SimpleTinyPDF
                     lastColor = span.Color;
                 }
 
-                float spanWidth = MeasureText(span.Text, span.Font, span.FontSize);
+                // Character spacing
+                if (span.CharacterSpacing != lastCharSpacing)
+                {
+                    _content.AppendFormat("{0} Tc\n", F(span.CharacterSpacing));
+                    lastCharSpacing = span.CharacterSpacing;
+                }
+
+                // Faux bold
+                if (span.Bold != lastBold)
+                {
+                    if (span.Bold)
+                        AppendFauxBoldStart(span.FontSize, span.Color);
+                    else
+                        AppendFauxBoldEnd();
+                    lastBold = span.Bold;
+                }
+                else if (span.Bold && (lastColor == null || !lastColor.Value.Equals(span.Color)))
+                {
+                    AppendColorStroke(span.Color);
+                }
+
+                // Italic requires per-span Tm positioning
+                if (usePerSpanTm)
+                    AppendTextMatrix(cursorX, pdfY, span.Italic);
+
+                float spanWidth = MeasureText(span.Text, span.Font, span.FontSize, span.CharacterSpacing);
                 _content.AppendFormat("{0} Tj\n", EncodeText(span.Text, span.Font));
                 if (span.Underline)
                     ulSpans?.Add((cursorX, spanWidth, span.FontSize, span.Color));
@@ -405,6 +475,8 @@ namespace SimpleTinyPDF
                 cursorX += spanWidth;
             }
 
+            if (lastBold) AppendFauxBoldEnd();
+            if (lastCharSpacing != 0f) _content.Append("0 Tc\n");
             _content.Append("ET\n");
             if (ulSpans != null)
             {
@@ -423,13 +495,14 @@ namespace SimpleTinyPDF
             PdfFontSource font, float fontSize,
             float lineSpacing, PdfColor? color,
             TextAlignment alignment, bool underline,
-            float opacity, string link, float rotation)
+            float opacity, string link, float rotation,
+            float characterSpacing = 0f, bool bold = false, bool italic = false)
         {
             var c = color ?? PdfColor.Black;
             var fontId = EnsureFont(font);
             float lineHeight = fontSize * lineSpacing;
 
-            var lines = FontMetrics.WrapText(text, font, fontSize, width);
+            var lines = FontMetrics.WrapText(text, font, fontSize, width, characterSpacing);
             float currentY = y;
 
             // Collect underline positions to draw after the text block
@@ -438,6 +511,7 @@ namespace SimpleTinyPDF
                 ulLines = new List<(float, float, float)>();
 
             bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;
+            bool justify = alignment == TextAlignment.Justify;
 
             _content.Append("q\n");
             AppendOpacity(opacity);
@@ -446,19 +520,64 @@ namespace SimpleTinyPDF
             _content.Append("BT\n");
             _content.AppendFormat("/{0} {1} Tf\n", fontId, F(fontSize));
             AppendColorFill(c);
+            if (bold) AppendFauxBoldStart(fontSize, c);
+            if (characterSpacing != 0f)
+                _content.AppendFormat("{0} Tc\n", F(characterSpacing));
 
-            foreach (var line in lines)
+            for (int li = 0; li < lines.Count; li++)
             {
+                var line = lines[li];
                 float pdfY = topDown ? Height - currentY - fontSize : currentY;
                 float drawX = x;
-                float lineW = MeasureText(line, font, fontSize);
+                float lineW = MeasureText(line, font, fontSize, characterSpacing);
+                bool isLastLine = (li == lines.Count - 1);
+
+                // Justification: distribute extra space across word gaps (not on last line)
+                if (justify && !isLastLine && lineW < width)
+                {
+                    int spaceCount = 0;
+                    foreach (char ch in line) if (ch == ' ') spaceCount++;
+
+                    if (spaceCount > 0)
+                    {
+                        float extraSpace = (width - lineW) / spaceCount;
+                        if (font.IsBuiltIn)
+                        {
+                            // Built-in fonts: Tw operator works with single-byte space
+                            _content.AppendFormat("{0} Tw\n", F(extraSpace));
+                            AppendTextMatrix(drawX, pdfY, italic);
+                            _content.AppendFormat("{0} Tj\n", EncodeText(line, font));
+                            _content.Append("0 Tw\n");
+                        }
+                        else
+                        {
+                            // Custom fonts: Tw doesn't work with CID, render word-by-word
+                            var words = line.Split(' ');
+                            float normalSpaceW = MeasureText(" ", font, fontSize, characterSpacing);
+                            float cursorX = drawX;
+                            for (int wi = 0; wi < words.Length; wi++)
+                            {
+                                if (wi > 0)
+                                    cursorX += normalSpaceW + extraSpace;
+                                AppendTextMatrix(cursorX, pdfY, italic);
+                                _content.AppendFormat("{0} Tj\n", EncodeText(words[wi], font));
+                                cursorX += MeasureText(words[wi], font, fontSize, characterSpacing);
+                            }
+                        }
+                        ulLines?.Add((drawX, pdfY, width));
+                        if (!string.IsNullOrEmpty(link))
+                            AddLinkAnnotation(link, drawX, pdfY, width, fontSize);
+                        currentY += topDown ? lineHeight : -lineHeight;
+                        continue;
+                    }
+                }
+
                 if (alignment == TextAlignment.Center)
                     drawX = x + (width - lineW) / 2f;
                 else if (alignment == TextAlignment.Right)
                     drawX = x + width - lineW;
 
-                // Use Tm (text matrix) for absolute positioning instead of Td (relative)
-                _content.AppendFormat("1 0 0 1 {0} {1} Tm\n", F(drawX), F(pdfY));
+                AppendTextMatrix(drawX, pdfY, italic);
                 _content.AppendFormat("{0} Tj\n", EncodeText(line, font));
                 ulLines?.Add((drawX, pdfY, lineW));
                 if (!string.IsNullOrEmpty(link))
@@ -466,6 +585,9 @@ namespace SimpleTinyPDF
                 currentY += topDown ? lineHeight : -lineHeight;
             }
 
+            if (bold) AppendFauxBoldEnd();
+            if (characterSpacing != 0f)
+                _content.Append("0 Tc\n");
             _content.Append("ET\n");
             if (ulLines != null)
             {
@@ -498,6 +620,7 @@ namespace SimpleTinyPDF
             var ulSegments = new List<(float x, float pdfY, float width, float fontSize, PdfColor color)>();
 
             bool topDown = CoordinateOrigin == CoordinateOrigin.TopDown;
+            bool justify = alignment == TextAlignment.Justify;
             float firstMaxFs = lines[0].MaxFontSize;
             if (firstMaxFs <= 0) firstMaxFs = 12f;
             float rotOriginY = topDown ? Height - y - firstMaxFs : y;
@@ -509,22 +632,53 @@ namespace SimpleTinyPDF
             float lastFontSize = -1;
             PdfColor? lastColor = null;
             float lastOpacity = -1f;
+            bool lastBold = false;
+            float lastCharSpacing = 0f;
 
-            foreach (var line in lines)
+            for (int li = 0; li < lines.Count; li++)
             {
+                var line = lines[li];
                 float maxFontSize = line.MaxFontSize;
                 if (maxFontSize <= 0) maxFontSize = 12f;
                 float lineHeight = maxFontSize * lineSpacing;
 
                 float pdfY = topDown ? Height - currentY - maxFontSize : currentY;
+                bool isLastLine = (li == lines.Count - 1);
+
+                // Calculate justification extra space per word gap
+                float justifyExtra = 0f;
+                bool useJustify = false;
+                if (justify && !isLastLine && line.TotalWidth < width)
+                {
+                    int spaceCount = 0;
+                    foreach (var w in line.Words)
+                        if (w.HasLeadingSpace) spaceCount++;
+                    if (spaceCount > 0)
+                    {
+                        justifyExtra = (width - line.TotalWidth) / spaceCount;
+                        useJustify = true;
+                    }
+                }
+
+                // Check if any word on this line has italic
+                bool lineHasItalic = false;
+                foreach (var w in line.Words)
+                    if (w.Italic) { lineHasItalic = true; break; }
+
+                // Use per-word Tm when justifying or when italic varies
+                bool usePerWordTm = useJustify || lineHasItalic;
 
                 float drawX = x;
-                if (alignment == TextAlignment.Center)
-                    drawX = x + (width - line.TotalWidth) / 2f;
-                else if (alignment == TextAlignment.Right)
-                    drawX = x + width - line.TotalWidth;
+                if (!useJustify)
+                {
+                    if (alignment == TextAlignment.Center)
+                        drawX = x + (width - line.TotalWidth) / 2f;
+                    else if (alignment == TextAlignment.Right)
+                        drawX = x + width - line.TotalWidth;
+                }
 
-                _content.AppendFormat("1 0 0 1 {0} {1} Tm\n", F(drawX), F(pdfY));
+                if (!usePerWordTm)
+                    AppendTextMatrix(drawX, pdfY, false);
 
                 float cursorX = drawX;
 
@@ -550,19 +704,44 @@ namespace SimpleTinyPDF
                         lastOpacity = word.Opacity;
                     }
 
+                    // Character spacing
+                    if (word.CharacterSpacing != lastCharSpacing)
+                    {
+                        _content.AppendFormat("{0} Tc\n", F(word.CharacterSpacing));
+                        lastCharSpacing = word.CharacterSpacing;
+                    }
+
+                    // Faux bold
+                    if (word.Bold != lastBold)
+                    {
+                        if (word.Bold)
+                            AppendFauxBoldStart(word.FontSize, word.Color);
+                        else
+                            AppendFauxBoldEnd();
+                        lastBold = word.Bold;
+                    }
+
                     if (word.HasLeadingSpace)
                     {
-                        if (lastFont == null || !lastFont.Equals(word.SpaceFont) ||
-                            lastFontSize != word.SpaceFontSize)
+                        float actualSpaceW = word.SpaceWidth + (useJustify ? justifyExtra : 0f);
+
+                        if (!usePerWordTm)
                         {
-                            var spaceFontId = EnsureFont(word.SpaceFont);
-                            _content.AppendFormat("/{0} {1} Tf\n", spaceFontId, F(word.SpaceFontSize));
-                            lastFont = word.SpaceFont;
-                            lastFontSize = word.SpaceFontSize;
+                            // Implicit cursor: render space character
+                            if (lastFont == null || !lastFont.Equals(word.SpaceFont) ||
+                                lastFontSize != word.SpaceFontSize)
+                            {
+                                var spaceFontId = EnsureFont(word.SpaceFont);
+                                _content.AppendFormat("/{0} {1} Tf\n", spaceFontId, F(word.SpaceFontSize));
+                                lastFont = word.SpaceFont;
+                                lastFontSize = word.SpaceFontSize;
+                            }
+                            _content.AppendFormat("{0} Tj\n", EncodeText(" ", word.SpaceFont));
                         }
-                        _content.AppendFormat("{0} Tj\n", EncodeText(" ", word.SpaceFont));
+                        // When using per-word Tm, skip space Tj — positioning handles it
+
                         if (word.SpaceUnderline)
-                            ulSegments.Add((cursorX, pdfY, word.SpaceWidth, word.SpaceFontSize, word.Color));
+                            ulSegments.Add((cursorX, pdfY, actualSpaceW, word.SpaceFontSize, word.Color));
 
                         // Handle link for the space portion
                         if (word.SpaceLink != currentLinkUrl)
@@ -581,7 +760,7 @@ namespace SimpleTinyPDF
                         else if (currentLinkUrl != null && word.SpaceFontSize > linkMaxFontSize)
                             linkMaxFontSize = word.SpaceFontSize;
 
-                        cursorX += word.SpaceWidth;
+                        cursorX += actualSpaceW;
                     }
 
                     if (string.IsNullOrEmpty(word.Text))
@@ -600,7 +779,11 @@ namespace SimpleTinyPDF
                     {
                         AppendColorFill(word.Color);
                         lastColor = word.Color;
+                        if (lastBold) AppendColorStroke(word.Color);
                     }
+
+                    if (usePerWordTm)
+                        AppendTextMatrix(cursorX, pdfY, word.Italic);
 
                     _content.AppendFormat("{0} Tj\n", EncodeText(word.Text, word.Font));
                     if (word.Underline)
@@ -633,6 +816,8 @@ namespace SimpleTinyPDF
                 currentY += topDown ? lineHeight : -lineHeight;
             }
 
+            if (lastBold) AppendFauxBoldEnd();
+            if (lastCharSpacing != 0f) _content.Append("0 Tc\n");
             _content.Append("ET\n");
             foreach (var ul in ulSegments)
                 AppendUnderline(ul.x, ul.pdfY, ul.width, ul.fontSize, ul.color);

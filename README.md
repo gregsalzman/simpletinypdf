@@ -29,7 +29,7 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 
 ## Features
 
-- **Text** — single-line, wrapped text boxes, rich text with mixed fonts/sizes/colors, alignment (left, center, right), underline, hyperlinks, opacity
+- **Text** — single-line, wrapped text boxes, rich text with mixed fonts/sizes/colors, alignment (left, center, right, justify), underline, hyperlinks, opacity, character spacing, faux bold, faux italic
 - **Images** — JPEG and PNG (with transparency), EXIF auto-orientation, scaling modes (Stretch, Fit, Fill), opacity
 - **Tables** — styled headers, column alignment, alternate row shading, auto-pagination with repeated headers, CSV import
 - **Barcodes** — Code 128, Code 39, EAN-13, UPC-A, and QR Code; pure vector rendering (no images); configurable colors, quiet zones, human-readable text, rotation, and opacity
@@ -216,6 +216,18 @@ float w = page.MeasureText("Hello", PdfFont.Helvetica, 12);
 // Rotated text — angle in degrees, clockwise
 page.DrawText("Rotated 45°", 300, 100, fontSize: 16, rotation: 45);
 page.DrawText("Rotated text box", 300, 200, width: 150, rotation: 90);
+
+// Character spacing — extra space between each character
+page.DrawText("SPACED OUT", 50, 250, characterSpacing: 3f);
+
+// Faux bold and italic — simulated styles for any font (built-in or custom)
+page.DrawText("Faux bold", 50, 270, bold: true);
+page.DrawText("Faux italic", 50, 290, italic: true);
+page.DrawText("Both", 50, 310, bold: true, italic: true);
+
+// Full justification — distributes words evenly across the line width
+float nextY3 = page.DrawText("Justified paragraph text...", 50, 340,
+    alignment: TextAlignment.Justify, width: 400);
 ```
 
 | Method | Returns | Description |
@@ -234,9 +246,12 @@ new TextSpan("bold", PdfFont.HelveticaBold, 14)                // custom font/si
 new TextSpan("fancy", PdfFont.TimesItalic, 12, PdfColor.Blue, underline: true, opacity: 0.8f)
 new TextSpan("click me", PdfFont.Helvetica, 12, PdfColor.Blue, underline: true,
     link: "https://example.com")                               // hyperlink
+new TextSpan("bold", bold: true)                               // faux bold
+new TextSpan("italic", italic: true)                           // faux italic
+new TextSpan("wide", characterSpacing: 2f)                     // character spacing
 ```
 
-**TextAlignment:** `TextAlignment.Left` (default), `TextAlignment.Center`, `TextAlignment.Right`
+**TextAlignment:** `TextAlignment.Left` (default), `TextAlignment.Center`, `TextAlignment.Right`, `TextAlignment.Justify`
 
 **Built-in Fonts**
 
@@ -927,6 +942,7 @@ doc.Save("sales-report.pdf");
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.59 | June 2, 2026 | Add character spacing, full justification (`TextAlignment.Justify`), and faux bold/italic for any font. Character spacing uses the PDF `Tc` operator. Faux bold uses fill+stroke rendering (`Tr 2`). Faux italic applies a 12° text matrix shear. All features work with both built-in and custom fonts, in single-line, wrapped, and rich text modes. |
 | 0.58 | June 2, 2026 | Add spot color (Separation) support with named inks, CMYK display fallback, and tint control. Spot colors work everywhere `PdfColor` is accepted. |
 | 0.57 | May 31, 2026 | Add TrueType font subsetting — only used glyphs are embedded, dramatically reducing PDF size for large fonts (especially CJK). Composite glyph dependencies are resolved automatically. CFF/OpenType fonts continue to embed in full. |
 | 0.56 | May 29, 2026 | Add AES-128 and AES-256 PDF encryption with user/owner passwords and permission flags. Pure C# implementation using built-in System.Security.Cryptography. |

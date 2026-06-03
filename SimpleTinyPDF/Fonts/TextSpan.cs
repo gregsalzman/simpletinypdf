@@ -29,12 +29,22 @@ namespace SimpleTinyPDF
         /// <summary>A URI hyperlink. When set, the text region becomes a clickable link.</summary>
         public string Link { get; }
 
+        /// <summary>Extra space in points added between each character (PDF Tc operator).</summary>
+        public float CharacterSpacing { get; }
+
+        /// <summary>Whether to apply faux bold (fill + stroke rendering) to this span.</summary>
+        public bool Bold { get; }
+
+        /// <summary>Whether to apply faux italic (text matrix shear) to this span.</summary>
+        public bool Italic { get; }
+
         /// <summary>
         /// Creates a new text span with the specified formatting.
         /// </summary>
         public TextSpan(string text, PdfFontSource font = null,
             float fontSize = 12f, PdfColor? color = null, bool underline = false,
-            float opacity = 1f, string link = null)
+            float opacity = 1f, string link = null,
+            float characterSpacing = 0f, bool bold = false, bool italic = false)
         {
             Text = text ?? string.Empty;
             Font = font ?? (PdfFontSource)PdfFont.Helvetica;
@@ -43,6 +53,9 @@ namespace SimpleTinyPDF
             Underline = underline;
             Opacity = Math.Max(0f, Math.Min(1f, opacity));
             Link = link;
+            CharacterSpacing = characterSpacing;
+            Bold = bold;
+            Italic = italic;
         }
     }
 }

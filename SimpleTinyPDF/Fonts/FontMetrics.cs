@@ -17,12 +17,14 @@ namespace SimpleTinyPDF
         /// <summary>
         /// Measures the width of a string in points (PdfFontSource overload).
         /// </summary>
-        internal static float MeasureString(string text, PdfFontSource font, float fontSize)
+        internal static float MeasureString(string text, PdfFontSource font, float fontSize,
+            float charSpacing = 0f)
         {
             if (font.IsBuiltIn)
-                return MeasureString(text, font.BuiltInFont, fontSize);
+                return MeasureString(text, font.BuiltInFont, fontSize, charSpacing);
             if (string.IsNullOrEmpty(text)) return 0;
             int total = 0;
+            int glyphCount = 0;
             for (int i = 0; i < text.Length; i++)
             {
                 int cp;
@@ -36,17 +38,22 @@ namespace SimpleTinyPDF
                     cp = text[i];
                 }
                 total += font.CustomFont.GetCharWidth(cp);
+                glyphCount++;
             }
-            return total * fontSize / 1000f;
+            float width = total * fontSize / 1000f;
+            if (charSpacing != 0f && glyphCount > 0)
+                width += glyphCount * charSpacing;
+            return width;
         }
 
         /// <summary>
         /// Word-wraps text to fit within the specified width (PdfFontSource overload).
         /// </summary>
-        internal static List<string> WrapText(string text, PdfFontSource font, float fontSize, float maxWidth)
+        internal static List<string> WrapText(string text, PdfFontSource font, float fontSize,
+            float maxWidth, float charSpacing = 0f)
         {
             if (font.IsBuiltIn)
-                return WrapText(text, font.BuiltInFont, fontSize, maxWidth);
+                return WrapText(text, font.BuiltInFont, fontSize, maxWidth, charSpacing);
 
             var result = new List<string>();
             if (string.IsNullOrEmpty(text))
@@ -67,11 +74,11 @@ namespace SimpleTinyPDF
                 var words = para.Split(' ');
                 var currentLine = new System.Text.StringBuilder();
                 float currentWidth = 0;
-                float spaceWidth = MeasureString(" ", font, fontSize);
+                float spaceWidth = MeasureString(" ", font, fontSize, charSpacing);
 
                 foreach (var word in words)
                 {
-                    float wordWidth = MeasureString(word, font, fontSize);
+                    float wordWidth = MeasureString(word, font, fontSize, charSpacing);
 
                     if (currentLine.Length == 0)
                     {
@@ -154,20 +161,25 @@ namespace SimpleTinyPDF
         /// <summary>
         /// Measures the width of a string in points.
         /// </summary>
-        internal static float MeasureString(string text, PdfFont font, float fontSize)
+        internal static float MeasureString(string text, PdfFont font, float fontSize,
+            float charSpacing = 0f)
         {
             if (string.IsNullOrEmpty(text)) return 0;
             int total = 0;
             foreach (char c in text)
                 total += GetCharWidth(font, c);
-            return total * fontSize / 1000f;
+            float width = total * fontSize / 1000f;
+            if (charSpacing != 0f && text.Length > 0)
+                width += text.Length * charSpacing;
+            return width;
         }
 
         /// <summary>
         /// Word-wraps text to fit within the specified width. Returns a list of lines.
         /// Handles explicit \n line breaks.
         /// </summary>
-        internal static List<string> WrapText(string text, PdfFont font, float fontSize, float maxWidth)
+        internal static List<string> WrapText(string text, PdfFont font, float fontSize,
+            float maxWidth, float charSpacing = 0f)
         {
             var result = new List<string>();
             if (string.IsNullOrEmpty(text))
@@ -189,11 +201,11 @@ namespace SimpleTinyPDF
                 var words = para.Split(' ');
                 var currentLine = new System.Text.StringBuilder();
                 float currentWidth = 0;
-                float spaceWidth = MeasureString(" ", font, fontSize);
+                float spaceWidth = MeasureString(" ", font, fontSize, charSpacing);
 
                 foreach (var word in words)
                 {
-                    float wordWidth = MeasureString(word, font, fontSize);
+                    float wordWidth = MeasureString(word, font, fontSize, charSpacing);
 
                     if (currentLine.Length == 0)
                     {
@@ -240,6 +252,9 @@ namespace SimpleTinyPDF
             internal float Opacity;
             internal string Link;
             internal string SpaceLink;
+            internal float CharacterSpacing;
+            internal bool Bold;
+            internal bool Italic;
         }
 
         internal class RichLine
@@ -262,6 +277,7 @@ namespace SimpleTinyPDF
             float pendingSpaceFontSize = 12f;
             bool pendingSpaceUnderline = false;
             string pendingSpaceLink = null;
+            float pendingSpaceCharSpacing = 0f;
 
             foreach (var span in spans)
             {
@@ -296,7 +312,10 @@ namespace SimpleTinyPDF
                                 SpaceWidth = 0,
                                 Underline = span.Underline,
                                 Opacity = span.Opacity,
-                                Link = span.Link
+                                Link = span.Link,
+                                CharacterSpacing = span.CharacterSpacing,
+                                Bold = span.Bold,
+                                Italic = span.Italic
                             });
                         }
                         continue;
@@ -325,6 +344,7 @@ namespace SimpleTinyPDF
                                 pendingSpaceFontSize = span.FontSize;
                                 pendingSpaceUnderline = span.Underline;
                                 pendingSpaceLink = span.Link;
+                                pendingSpaceCharSpacing = span.CharacterSpacing;
                             }
                             break;
                         }
@@ -334,7 +354,7 @@ namespace SimpleTinyPDF
                         while (charIdx < para.Length && para[charIdx] != ' ')
                             charIdx++;
                         string wordText = para.Substring(wordStart, charIdx - wordStart);
-                        float wordWidth = MeasureString(wordText, span.Font, span.FontSize);
+                        float wordWidth = MeasureString(wordText, span.Font, span.FontSize, span.CharacterSpacing);
 
                         // Determine leading space
                         bool hasSpace = false;
@@ -342,6 +362,7 @@ namespace SimpleTinyPDF
                         float spaceFontSize = span.FontSize;
                         bool spaceUnderline = span.Underline;
                         string spaceLink = span.Link;
+                        float spaceCharSpacing = span.CharacterSpacing;
 
                         if (foundSpace && !firstWordInPara)
                         {
@@ -365,10 +386,11 @@ namespace SimpleTinyPDF
                             spaceFontSize = pendingSpaceFontSize;
                             spaceUnderline = pendingSpaceUnderline;
                             spaceLink = pendingSpaceLink;
+                            spaceCharSpacing = pendingSpaceCharSpacing;
                         }
 
                         float spaceWidth = hasSpace
-                            ? MeasureString(" ", spaceFont, spaceFontSize)
+                            ? MeasureString(" ", spaceFont, spaceFontSize, spaceCharSpacing)
                             : 0;
 
                         allWords.Add(new StyledWord
@@ -387,7 +409,10 @@ namespace SimpleTinyPDF
                             SpaceUnderline = spaceUnderline,
                             Opacity = span.Opacity,
                             Link = span.Link,
-                            SpaceLink = spaceLink
+                            SpaceLink = spaceLink,
+                            CharacterSpacing = span.CharacterSpacing,
+                            Bold = span.Bold,
+                            Italic = span.Italic
                         });
 
                         pendingSpace = false;
@@ -410,7 +435,10 @@ namespace SimpleTinyPDF
                             SpaceWidth = 0,
                             Underline = span.Underline,
                             Opacity = span.Opacity,
-                            Link = span.Link
+                            Link = span.Link,
+                            CharacterSpacing = span.CharacterSpacing,
+                            Bold = span.Bold,
+                            Italic = span.Italic
                         });
                     }
                 }

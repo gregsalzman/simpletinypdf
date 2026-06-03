@@ -26,7 +26,8 @@ namespace SimpleTinyPDF
     {
         Left,
         Center,
-        Right
+        Right,
+        Justify
     }
 
     internal static class PdfFontNames

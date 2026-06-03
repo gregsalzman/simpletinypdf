@@ -37,6 +37,9 @@ SimpleTinyPDF.Tests/TestOutput/
 ## Benchmark artifacts
 BenchmarkDotNet.Artifacts/
 
+## Personal notes
+NOTES.txt
+
 ## OS files
 Thumbs.db
 ehthumbs.db
