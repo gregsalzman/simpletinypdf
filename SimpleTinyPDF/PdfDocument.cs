@@ -12,6 +12,7 @@ namespace SimpleTinyPDF
         private readonly List<PdfPage> _pages = new List<PdfPage>();
         private readonly List<PdfImage> _images = new List<PdfImage>();
         private readonly List<PdfBookmark> _bookmarks = new List<PdfBookmark>();
+        private readonly List<PdfRadioGroup> _radioGroups = new List<PdfRadioGroup>();
 
         /// <summary>Document title (appears in PDF metadata).</summary>
         public string Title { get; set; }
@@ -24,6 +25,12 @@ namespace SimpleTinyPDF
         /// with the specified algorithm and passwords.
         /// </summary>
         public PdfEncryptionOptions Encryption { get; set; }
+
+        /// <summary>
+        /// Optional digital signature settings. When set, the saved PDF will be
+        /// digitally signed with the specified certificate.
+        /// </summary>
+        public PdfSignatureOptions Signature { get; set; }
 
         /// <summary>The list of pages in this document.</summary>
         public IReadOnlyList<PdfPage> Pages => _pages;
@@ -138,6 +145,24 @@ namespace SimpleTinyPDF
 
         /// <summary>Returns the top-level bookmarks in this document.</summary>
         internal IReadOnlyList<PdfBookmark> GetBookmarks() => _bookmarks;
+
+        /// <summary>
+        /// Creates a radio button group. Add individual radio buttons to pages
+        /// with <see cref="PdfPage.AddRadioButton"/>.
+        /// </summary>
+        /// <param name="name">The field name shared by all radio buttons in this group.</param>
+        /// <param name="options">Optional group settings (selected value, colors, flags).</param>
+        /// <returns>The radio group, which is passed to <see cref="PdfPage.AddRadioButton"/>.</returns>
+        public PdfRadioGroup CreateRadioGroup(string name, RadioGroupOptions options = null)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            var group = new PdfRadioGroup(name, options);
+            _radioGroups.Add(group);
+            return group;
+        }
+
+        /// <summary>Returns the radio groups in this document.</summary>
+        internal IReadOnlyList<PdfRadioGroup> GetRadioGroups() => _radioGroups;
 
         /// <summary>Saves the PDF document to a file.</summary>
         /// <param name="filePath">The path of the file to create or overwrite.</param>

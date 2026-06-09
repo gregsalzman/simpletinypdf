@@ -1,156 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace SimpleTinyPDF
 {
-    internal class PdfObj
-    {
-        internal int ObjectNumber;
-        internal string Ref => $"{ObjectNumber} 0 R";
-        internal virtual void WriteTo(PdfBinaryWriter w) { }
-    }
-
-    internal class PdfDict : PdfObj
-    {
-        internal readonly List<KeyValuePair<string, string>> Entries = new List<KeyValuePair<string, string>>();
-
-        internal void Set(string key, string value)
-        {
-            for (int i = 0; i < Entries.Count; i++)
-            {
-                if (Entries[i].Key == key)
-                {
-                    Entries[i] = new KeyValuePair<string, string>(key, value);
-                    return;
-                }
-            }
-            Entries.Add(new KeyValuePair<string, string>(key, value));
-        }
-
-        internal override void WriteTo(PdfBinaryWriter w)
-        {
-            w.WriteAscii("<<\n");
-            foreach (var kv in Entries)
-                w.WriteAscii($"/{kv.Key} {kv.Value}\n");
-            w.WriteAscii(">>\n");
-        }
-    }
-
-    internal class PdfStream : PdfDict
-    {
-        internal byte[] Data = Array.Empty<byte>();
-
-        internal override void WriteTo(PdfBinaryWriter w)
-        {
-            Set("Length", Data.Length.ToString());
-            w.WriteAscii("<<\n");
-            foreach (var kv in Entries)
-                w.WriteAscii($"/{kv.Key} {kv.Value}\n");
-            w.WriteAscii(">>\nstream\n");
-            w.WriteBytes(Data);
-            w.WriteAscii("\nendstream\n");
-        }
-    }
-
-    internal class PdfArray : PdfObj
-    {
-        internal string Value;
-        internal override void WriteTo(PdfBinaryWriter w)
-        {
-            w.WriteAscii(Value + "\n");
-        }
-    }
-
-    internal class PdfBinaryWriter
-    {
-        private readonly Stream _stream;
-        internal long Position => _stream.Position;
-
-        internal PdfBinaryWriter(Stream stream) => _stream = stream;
-
-        internal void WriteAscii(string text)
-        {
-            var bytes = Encoding.ASCII.GetBytes(text);
-            _stream.Write(bytes, 0, bytes.Length);
-        }
-
-        internal void WriteBytes(byte[] data) =>
-            _stream.Write(data, 0, data.Length);
-    }
-
-    internal static class PdfStringHelper
-    {
-        // Map Unicode characters to WinAnsiEncoding byte values
-        internal static readonly Dictionary<char, byte> UnicodeToWinAnsi = new Dictionary<char, byte>
-        {
-            { '\u20AC', 0x80 }, // Euro sign
-            { '\u201A', 0x82 }, // Single low-9 quotation mark
-            { '\u0192', 0x83 }, // Latin small letter f with hook
-            { '\u201E', 0x84 }, // Double low-9 quotation mark
-            { '\u2026', 0x85 }, // Horizontal ellipsis
-            { '\u2020', 0x86 }, // Dagger
-            { '\u2021', 0x87 }, // Double dagger
-            { '\u02C6', 0x88 }, // Modifier letter circumflex accent
-            { '\u2030', 0x89 }, // Per mille sign
-            { '\u0160', 0x8A }, // Latin capital letter S with caron
-            { '\u2039', 0x8B }, // Single left-pointing angle quotation mark
-            { '\u0152', 0x8C }, // Latin capital ligature OE
-            { '\u017D', 0x8E }, // Latin capital letter Z with caron
-            { '\u2018', 0x91 }, // Left single quotation mark
-            { '\u2019', 0x92 }, // Right single quotation mark
-            { '\u201C', 0x93 }, // Left double quotation mark
-            { '\u201D', 0x94 }, // Right double quotation mark
-            { '\u2022', 0x95 }, // Bullet
-            { '\u2013', 0x96 }, // En dash
-            { '\u2014', 0x97 }, // Em dash
-            { '\u02DC', 0x98 }, // Small tilde
-            { '\u2122', 0x99 }, // Trade mark sign
-            { '\u0161', 0x9A }, // Latin small letter s with caron
-            { '\u203A', 0x9B }, // Single right-pointing angle quotation mark
-            { '\u0153', 0x9C }, // Latin small ligature oe
-            { '\u017E', 0x9E }, // Latin small letter z with caron
-            { '\u0178', 0x9F }, // Latin capital letter Y with diaeresis
-        };
-
-        internal static string Escape(string text) => Escape(text, null);
-
-        internal static string Escape(string text, EncodingExtension ext)
-        {
-            if (text == null) return "()";
-            var sb = new StringBuilder(text.Length + 10);
-            sb.Append('(');
-            foreach (char c in text)
-            {
-                if (c == '\\') sb.Append("\\\\");
-                else if (c == '(') sb.Append("\\(");
-                else if (c == ')') sb.Append("\\)");
-                else if (c >= 32 && c <= 126) sb.Append(c);
-                else if (c < 256) sb.AppendFormat("\\{0}", Convert.ToString((int)c, 8).PadLeft(3, '0'));
-                else if (UnicodeToWinAnsi.TryGetValue(c, out byte winAnsiCode))
-                    sb.AppendFormat("\\{0}", Convert.ToString(winAnsiCode, 8).PadLeft(3, '0'));
-                else if (ext != null && GlyphMapping.UnicodeToGlyphName.ContainsKey(c))
-                {
-                    if (!ext.TryEncode(c, out byte extCode))
-                        throw new NotSupportedException(
-                            $"Character '{c}' (U+{(int)c:X4}) cannot be encoded: the maximum of {ext.Capacity} " +
-                            "extended characters per font per page has been reached.");
-                    sb.AppendFormat("\\{0}", Convert.ToString(extCode, 8).PadLeft(3, '0'));
-                }
-                // Characters with no known glyph mapping are silently dropped
-            }
-            sb.Append(')');
-            return sb.ToString();
-        }
-
-        internal static string F(float value) =>
-            value.ToString("0.####", CultureInfo.InvariantCulture);
-    }
-
-    internal static class PdfWriter
+    internal static partial class PdfWriter
     {
         internal static void Write(PdfDocument doc, Stream output)
         {
@@ -623,6 +479,202 @@ namespace SimpleTinyPDF
                 catalog.Set("Outlines", outlineRoot.Ref);
             }
 
+            // 8. AcroForm fields
+            var fieldRefs = new List<string>();
+            var drFontParts = new List<string>();
+            var drFontNames = new HashSet<string>();
+            PdfDict sigValueDict = null;
+
+            // Create a shared font object for form fields (like iText does)
+            // This ensures DR, AP Resources, and Acrobat's regeneration all use the same font
+            PdfDict formFontObj = null;
+
+            // Collect form fields across all pages and build widgets + appearances
+            foreach (var page in doc.Pages)
+            {
+                var formFields = page.GetFormFields();
+                if (formFields.Count == 0) continue;
+
+                // Group radio buttons by group for parent field creation
+                var radioGroups = new Dictionary<PdfRadioGroup, List<(FormField field, PdfDict widget)>>();
+
+                foreach (var field in formFields)
+                {
+                    if (field.Type == FormFieldType.RadioButton)
+                    {
+                        // Radio buttons are collected and processed per-group below
+                        if (!radioGroups.ContainsKey(field.RadioGroup))
+                            radioGroups[field.RadioGroup] = new List<(FormField, PdfDict)>();
+
+                        var rbWidget = CreateFormWidget(field, pageDicts[page], objects, AddObj,
+                            drFontParts, drFontNames, isRadioChild: true, ref formFontObj);
+                        radioGroups[field.RadioGroup].Add((field, rbWidget));
+                        continue;
+                    }
+
+                    var widget = CreateFormWidget(field, pageDicts[page], objects, AddObj,
+                        drFontParts, drFontNames, isRadioChild: false, ref formFontObj);
+                    fieldRefs.Add(widget.Ref);
+
+                    // Add widget to page annots
+                    AppendAnnotToPage(pageDicts[page], widget);
+                }
+
+                // Process radio groups
+                foreach (var kv in radioGroups)
+                {
+                    var group = kv.Key;
+                    var radioWidgets = kv.Value;
+
+                    // Create parent field dict for the radio group
+                    var parentField = new PdfDict();
+                    AddObj(parentField); // assign object number before referencing
+                    parentField.Set("FT", "/Btn");
+                    parentField.Set("T", PdfStringHelper.Escape(group.Name));
+                    int ff = 49152; // Radio (bit 16) + NoToggleToOff (bit 15)
+                    if (group.ReadOnly) ff |= 1;
+                    if (group.Required) ff |= 2;
+                    parentField.Set("Ff", ff.ToString());
+
+                    // Set value to selected radio
+                    if (group.SelectedValue != null)
+                        parentField.Set("V", "/" + group.SelectedValue);
+                    else
+                        parentField.Set("V", "/Off");
+
+                    var kidsRefs = new List<string>();
+                    foreach (var (field, widget) in radioWidgets)
+                    {
+                        widget.Set("Parent", parentField.Ref);
+                        kidsRefs.Add(widget.Ref);
+                        AppendAnnotToPage(pageDicts[page], widget);
+                    }
+                    parentField.Set("Kids", "[" + string.Join(" ", kidsRefs) + "]");
+                    fieldRefs.Add(parentField.Ref);
+                }
+            }
+
+            // 9. Digital signature
+            bool hasSigFields = false;
+            if (doc.Signature != null)
+            {
+                hasSigFields = true;
+                var sigOpts = doc.Signature;
+                var cert = PdfSigner.ResolveCertificate(sigOpts);
+
+                // Signature value dictionary
+                sigValueDict = new PdfDict();
+                sigValueDict.Set("Type", "/Sig");
+                sigValueDict.Set("Filter", "/Adobe.PPKLite");
+                sigValueDict.Set("SubFilter", "/adbe.pkcs7.detached");
+
+                // Placeholder ByteRange and Contents (patched after writing)
+                string brPlaceholder = "[0 0000000000 0000000000 0000000000]";
+                sigValueDict.Set("ByteRange", brPlaceholder);
+                sigValueDict.Set("Contents", "<" + new string('0', PdfSigner.MaxSignatureHexChars) + ">");
+
+                // Metadata
+                sigValueDict.Set("M", PdfStringHelper.Escape("D:" + DateTime.Now.ToString("yyyyMMddHHmmss")));
+                sigValueDict.Set("Name", PdfStringHelper.Escape(cert.Subject));
+                if (sigOpts.Reason != null)
+                    sigValueDict.Set("Reason", PdfStringHelper.Escape(sigOpts.Reason));
+                if (sigOpts.Location != null)
+                    sigValueDict.Set("Location", PdfStringHelper.Escape(sigOpts.Location));
+                if (sigOpts.ContactInfo != null)
+                    sigValueDict.Set("ContactInfo", PdfStringHelper.Escape(sigOpts.ContactInfo));
+                AddObj(sigValueDict);
+
+                // Signature field widget
+                var sigField = new PdfDict();
+                sigField.Set("Type", "/Annot");
+                sigField.Set("Subtype", "/Widget");
+                sigField.Set("FT", "/Sig");
+                sigField.Set("V", sigValueDict.Ref);
+                sigField.Set("T", PdfStringHelper.Escape("Signature1"));
+                sigField.Set("F", "132"); // Print + Locked
+
+                // Determine page for the signature
+                var sigPage = sigOpts.Page ?? doc.Pages[0];
+                if (pageDicts.TryGetValue(sigPage, out var sigPageDict))
+                    sigField.Set("P", sigPageDict.Ref);
+
+                if (sigOpts.Page != null)
+                {
+                    // Visible signature
+                    float sx = sigOpts.X;
+                    float sy = sigPage.CoordinateOrigin == CoordinateOrigin.TopDown
+                        ? sigPage.Height - sigOpts.Y - sigOpts.Height
+                        : sigOpts.Y;
+                    float sx2 = sx + sigOpts.Width;
+                    float sy2 = sy + sigOpts.Height;
+                    sigField.Set("Rect", $"[{PdfStringHelper.F(sx)} {PdfStringHelper.F(sy)} {PdfStringHelper.F(sx2)} {PdfStringHelper.F(sy2)}]");
+
+                    // Build appearance Form XObject
+                    var apContent = FormAppearanceBuilder.BuildSignatureAppearance(
+                        sigOpts.Width, sigOpts.Height,
+                        cert.Subject, sigOpts.Reason, sigOpts.Location, DateTime.Now);
+                    var apStream = new PdfStream();
+                    apStream.Set("Type", "/XObject");
+                    apStream.Set("Subtype", "/Form");
+                    apStream.Set("BBox", $"[0 0 {PdfStringHelper.F(sigOpts.Width)} {PdfStringHelper.F(sigOpts.Height)}]");
+                    // Ensure shared form font exists for signature AP
+                    if (formFontObj == null)
+                    {
+                        formFontObj = new PdfDict();
+                        formFontObj.Set("Type", "/Font");
+                        formFontObj.Set("Subtype", "/Type1");
+                        formFontObj.Set("BaseFont", "/Helvetica");
+                        formFontObj.Set("Encoding", "/WinAnsiEncoding");
+                        AddObj(formFontObj);
+                    }
+                    apStream.Set("Resources", $"<< /Font << /F1 {formFontObj.Ref} >> >>");
+                    apStream.Data = apContent;
+                    AddObj(apStream);
+                    sigField.Set("AP", $"<< /N {apStream.Ref} >>");
+                }
+                else
+                {
+                    // Invisible signature
+                    sigField.Set("Rect", "[0 0 0 0]");
+                }
+
+                AddObj(sigField);
+                fieldRefs.Add(sigField.Ref);
+
+                if (sigPageDict != null)
+                    AppendAnnotToPage(sigPageDict, sigField);
+
+                // Ensure Helvetica is in DR for signature appearance
+                if (!drFontNames.Contains("Helvetica"))
+                {
+                    if (formFontObj == null)
+                    {
+                        formFontObj = new PdfDict();
+                        formFontObj.Set("Type", "/Font");
+                        formFontObj.Set("Subtype", "/Type1");
+                        formFontObj.Set("BaseFont", "/Helvetica");
+                        formFontObj.Set("Encoding", "/WinAnsiEncoding");
+                        AddObj(formFontObj);
+                    }
+                    drFontParts.Add($"/F1 {formFontObj.Ref}");
+                    drFontNames.Add("Helvetica");
+                }
+            }
+
+            // Build AcroForm dict if there are any fields
+            if (fieldRefs.Count > 0)
+            {
+                var acroForm = new PdfDict();
+                acroForm.Set("Fields", "[" + string.Join(" ", fieldRefs) + "]");
+                if (drFontParts.Count > 0)
+                    acroForm.Set("DR", "<< /Font << " + string.Join(" ", drFontParts) + " >> >>");
+                acroForm.Set("DA", "(/F1 12 Tf)");
+                if (hasSigFields)
+                    acroForm.Set("SigFlags", "3");
+                AddObj(acroForm);
+                catalog.Set("AcroForm", acroForm.Ref);
+            }
+
             // Generate file ID early (needed for encryption key derivation)
             byte[] idHash;
             using (var md5 = MD5.Create())
@@ -641,31 +693,77 @@ namespace SimpleTinyPDF
                 encryptDict = encryptor.BuildEncryptionDict();
                 AddObj(encryptDict);
 
-                // Encrypt all objects (except the encryption dict itself)
+                // Encrypt all objects (except encryption dict and signature value dict)
                 foreach (var obj in objects)
                 {
                     if (obj == encryptDict) continue;
+                    if (obj == sigValueDict) continue;
                     EncryptObject(obj, encryptor);
                 }
             }
 
-            // Write PDF to stream
-            var w = new PdfBinaryWriter(output);
+            // Write PDF to stream (or MemoryStream if signing)
+            Stream writeTarget = output;
+            MemoryStream sigBuffer = null;
+            if (doc.Signature != null)
+            {
+                sigBuffer = new MemoryStream();
+                writeTarget = sigBuffer;
+            }
 
-            // Header — version depends on encryption level
+            var w = new PdfBinaryWriter(writeTarget);
+
+            // Header — version depends on encryption level and features
             string pdfVersion = "1.4";
             if (doc.Encryption != null)
                 pdfVersion = doc.Encryption.Level == PdfEncryptionLevel.Aes256 ? "2.0" : "1.6";
+            else if (doc.Signature != null || fieldRefs.Count > 0)
+                pdfVersion = "1.6";
             w.WriteAscii($"%PDF-{pdfVersion}\n");
             w.WriteBytes(new byte[] { 0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A }); // binary comment
 
-            // Body
+            // Body — track signature placeholder positions
+            long contentsValueStart = 0, contentsValueEnd = 0;
+            long byteRangeValueStart = 0, byteRangeValueEnd = 0;
+
             var offsets = new long[objects.Count];
             for (int i = 0; i < objects.Count; i++)
             {
                 offsets[i] = w.Position;
                 w.WriteAscii($"{objects[i].ObjectNumber} 0 obj\n");
-                objects[i].WriteTo(w);
+
+                if (sigValueDict != null && objects[i] == sigValueDict)
+                {
+                    // Write sig value dict manually to record placeholder positions
+                    w.WriteAscii("<<\n");
+                    foreach (var kv in sigValueDict.Entries)
+                    {
+                        w.WriteAscii($"/{kv.Key} ");
+                        if (kv.Key == "ByteRange")
+                        {
+                            byteRangeValueStart = w.Position;
+                            w.WriteAscii(kv.Value);
+                            byteRangeValueEnd = w.Position;
+                        }
+                        else if (kv.Key == "Contents")
+                        {
+                            contentsValueStart = w.Position;
+                            w.WriteAscii(kv.Value);
+                            contentsValueEnd = w.Position;
+                        }
+                        else
+                        {
+                            w.WriteAscii(kv.Value);
+                        }
+                        w.WriteAscii("\n");
+                    }
+                    w.WriteAscii(">>\n");
+                }
+                else
+                {
+                    objects[i].WriteTo(w);
+                }
+
                 w.WriteAscii("endobj\n");
             }
 
@@ -687,6 +785,18 @@ namespace SimpleTinyPDF
             w.WriteAscii("startxref\n");
             w.WriteAscii($"{xrefPos}\n");
             w.WriteAscii("%%EOF\n");
+
+            // Apply signature if configured
+            if (sigBuffer != null)
+            {
+                var pdfBytes = sigBuffer.ToArray();
+                sigBuffer.Dispose();
+                PdfSigner.ApplySignature(pdfBytes,
+                    contentsValueStart, contentsValueEnd,
+                    byteRangeValueStart, byteRangeValueEnd,
+                    doc.Signature);
+                output.Write(pdfBytes, 0, pdfBytes.Length);
+            }
         }
 
         private static string EscapeSpotName(string name)

@@ -11,8 +11,6 @@
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.14.*" />
     <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.4" />
-    <PackageReference Include="itext" Version="9.6.0" />
-    <PackageReference Include="itext.bouncy-castle-adapter" Version="9.6.0" />
     <PackageReference Include="QuestPDF" Version="2026.5.*" />
     <PackageReference Include="IronPdf" Version="2026.5.*" />
   </ItemGroup>

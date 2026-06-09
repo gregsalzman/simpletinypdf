@@ -24,6 +24,7 @@ namespace SimpleTinyPDF
         private int _nextGsId = 1;
         private int _nextCsId = 1;
         private readonly List<PageAnnotation> _annotations = new List<PageAnnotation>();
+        private readonly List<FormField> _formFields = new List<FormField>();
         internal PdfDocument Document { get; set; }
 
         /// <summary>Page width in points.</summary>
@@ -51,6 +52,7 @@ namespace SimpleTinyPDF
         internal string GetContentStream() => _content.ToString();
         internal StringBuilder GetContentBuilder() => _content;
         internal IReadOnlyList<PageAnnotation> GetAnnotations() => _annotations;
+        internal IReadOnlyList<FormField> GetFormFields() => _formFields;
 
         internal EncodingExtension GetOrCreateEncodingExtension(PdfFontSource font)
         {
@@ -1279,6 +1281,158 @@ namespace SimpleTinyPDF
                 Y1 = pdfY + height,
                 TargetPage = targetPage,
                 TargetY = targetY
+            });
+        }
+
+        // ── Form fields (public API) ─────────────────────────────
+
+        private float FormPdfY(float y, float height) =>
+            CoordinateOrigin == CoordinateOrigin.TopDown ? Height - y - height : y;
+
+        /// <summary>Adds a text input form field.</summary>
+        public void AddTextField(string name, float x, float y, float width, float height,
+            TextFieldOptions options = null)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            var o = options ?? new TextFieldOptions();
+            _formFields.Add(new FormField
+            {
+                Type = FormFieldType.Text,
+                Name = name,
+                X = x, Y = FormPdfY(y, height), Width = width, Height = height,
+                Font = o.Font ?? (PdfFontSource)PdfFont.Helvetica,
+                FontSize = o.FontSize,
+                TextColor = o.TextColor,
+                BackgroundColor = o.BackgroundColor,
+                BorderColor = o.BorderColor,
+                BorderWidth = o.BorderWidth,
+                Value = o.Value,
+                DefaultValue = o.DefaultValue,
+                MultiLine = o.MultiLine,
+                Password = o.Password,
+                ReadOnly = o.ReadOnly,
+                Required = o.Required,
+                MaxLength = o.MaxLength,
+                Alignment = o.Alignment
+            });
+        }
+
+        /// <summary>Adds a checkbox form field.</summary>
+        public void AddCheckbox(string name, float x, float y, float size,
+            CheckboxOptions options = null)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            var o = options ?? new CheckboxOptions();
+            _formFields.Add(new FormField
+            {
+                Type = FormFieldType.Checkbox,
+                Name = name,
+                X = x, Y = FormPdfY(y, size), Width = size, Height = size,
+                BorderColor = o.BorderColor,
+                BackgroundColor = o.BackgroundColor,
+                CheckColor = o.CheckColor,
+                BorderWidth = o.BorderWidth,
+                Checked = o.Checked,
+                ExportValue = o.ExportValue ?? "Yes",
+                ReadOnly = o.ReadOnly,
+                Required = o.Required
+            });
+        }
+
+        /// <summary>Adds a radio button to an existing radio group.</summary>
+        public void AddRadioButton(PdfRadioGroup group, string value,
+            float x, float y, float size)
+        {
+            if (group == null) throw new ArgumentNullException(nameof(group));
+            if (value == null) throw new ArgumentNullException(nameof(value));
+            _formFields.Add(new FormField
+            {
+                Type = FormFieldType.RadioButton,
+                Name = group.Name,
+                X = x, Y = FormPdfY(y, size), Width = size, Height = size,
+                RadioGroup = group,
+                RadioValue = value,
+                BorderColor = group.BorderColor,
+                BackgroundColor = group.BackgroundColor,
+                DotColor = group.DotColor,
+                BorderWidth = group.BorderWidth,
+                ReadOnly = group.ReadOnly,
+                Required = group.Required
+            });
+        }
+
+        /// <summary>Adds a dropdown (combo box) form field.</summary>
+        public void AddDropdown(string name, float x, float y, float width, float height,
+            string[] items, DropdownOptions options = null)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            if (items == null) throw new ArgumentNullException(nameof(items));
+            var o = options ?? new DropdownOptions();
+            _formFields.Add(new FormField
+            {
+                Type = FormFieldType.Dropdown,
+                Name = name,
+                X = x, Y = FormPdfY(y, height), Width = width, Height = height,
+                Font = o.Font ?? (PdfFontSource)PdfFont.Helvetica,
+                FontSize = o.FontSize,
+                TextColor = o.TextColor,
+                BackgroundColor = o.BackgroundColor,
+                BorderColor = o.BorderColor,
+                BorderWidth = o.BorderWidth,
+                Items = items,
+                SelectedValue = o.SelectedValue,
+                Editable = o.Editable,
+                ReadOnly = o.ReadOnly,
+                Required = o.Required
+            });
+        }
+
+        /// <summary>Adds a listbox form field.</summary>
+        public void AddListbox(string name, float x, float y, float width, float height,
+            string[] items, ListboxOptions options = null)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            if (items == null) throw new ArgumentNullException(nameof(items));
+            var o = options ?? new ListboxOptions();
+            _formFields.Add(new FormField
+            {
+                Type = FormFieldType.Listbox,
+                Name = name,
+                X = x, Y = FormPdfY(y, height), Width = width, Height = height,
+                Font = o.Font ?? (PdfFontSource)PdfFont.Helvetica,
+                FontSize = o.FontSize,
+                TextColor = o.TextColor,
+                BackgroundColor = o.BackgroundColor,
+                BorderColor = o.BorderColor,
+                BorderWidth = o.BorderWidth,
+                Items = items,
+                SelectedValues = o.SelectedValues,
+                MultiSelect = o.MultiSelect,
+                ReadOnly = o.ReadOnly,
+                Required = o.Required
+            });
+        }
+
+        /// <summary>Adds a push button form field.</summary>
+        public void AddButton(string name, string label, float x, float y,
+            float width, float height, ButtonOptions options = null)
+        {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            var o = options ?? new ButtonOptions();
+            _formFields.Add(new FormField
+            {
+                Type = FormFieldType.PushButton,
+                Name = name,
+                X = x, Y = FormPdfY(y, height), Width = width, Height = height,
+                Font = o.Font ?? (PdfFontSource)PdfFont.Helvetica,
+                FontSize = o.FontSize,
+                TextColor = o.TextColor,
+                BackgroundColor = o.BackgroundColor,
+                BorderColor = o.BorderColor,
+                BorderWidth = o.BorderWidth,
+                Label = label,
+                ReadOnly = false,
+                Required = false
             });
         }
     }

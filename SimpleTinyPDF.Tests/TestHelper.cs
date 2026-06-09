@@ -32,11 +32,12 @@ namespace SimpleTinyPDF.Tests
         /// Rasterizes a PDF page to a bitmap. Returns the bitmap for assertions.
         /// Also saves it as a PNG to TestOutput.
         /// </summary>
-        public static SKBitmap RasterizePage(byte[] pdfBytes, string testName, int pageIndex = 0, int dpi = 150)
+        public static SKBitmap RasterizePage(byte[] pdfBytes, string testName, int pageIndex = 0, int dpi = 150,
+            bool withAnnotations = false, bool withFormFill = false)
         {
             var pngPath = Path.Combine(OutputDir, $"{testName}_page{pageIndex}.png");
             Directory.CreateDirectory(Path.GetDirectoryName(pngPath)!);
-            var options = new RenderOptions(Dpi: dpi);
+            var options = new RenderOptions(Dpi: dpi, WithAnnotations: withAnnotations, WithFormFill: withFormFill);
 
             var bitmap = Conversion.ToImage(pdfBytes, page: pageIndex, options: options);
 

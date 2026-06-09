@@ -2,9 +2,9 @@
 
 [![NuGet](https://img.shields.io/nuget/v/SimpleTinyPDF)](https://www.nuget.org/packages/SimpleTinyPDF)
 
-A small-but-mighty zero-dependency PDF generation library for .NET.  SimpleTinyPDF is faster and uses less memory than most alternative packages.  It doesn't do everything, but likely does what you need.
+A small-but-mighty zero-dependency PDF generation library for .NET.  It is faster and uses less memory than most alternative packages.  SimpleTinyPDF acheives these results by not trying to do everything, but there's a good chance it does what you need!
 
-SimpleTinyPDF lets you create PDF documents from C# with no external packages. It targets .NET Standard 2.0, so it works with .NET Framework 4.6.1+, .NET Core 2.0+, and .NET 5+. 
+ SimpleTinyPDF targets .NET Standard 2.0, so it works with .NET Framework 4.6.1+, .NET Core 2.0+, and .NET 5+. 
 
 ## Table of Contents
 
@@ -22,6 +22,8 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
   - [Annotations](#annotations)
   - [Encryption](#encryption)
   - [Barcodes](#barcodes)
+  - [Form Fields (AcroForms)](#form-fields-acroforms)
+  - [Digital Signatures](#digital-signatures)
 - [Example: Invoice with Company Logo](#example-invoice-with-company-logo)
 - [Example: CSV to Table Report](#example-csv-to-table-report)
 - [Version History](#version-history)
@@ -38,6 +40,8 @@ SimpleTinyPDF lets you create PDF documents from C# with no external packages. I
 - **Bookmarks** — hierarchical outline / table of contents
 - **Annotations** — text (sticky notes), markup (highlight, underline, strikeout), stamps (Approved, Draft, Confidential, etc.), and internal links (navigate to another page)
 - **Encryption** — AES-128 and AES-256 password protection with configurable user/owner passwords and granular permission flags (print, copy, modify, annotate, etc.)
+- **Form Fields (AcroForms)** — text fields (single/multi-line, password), checkboxes, radio buttons, dropdowns (combo boxes), listboxes (single/multi-select), and push buttons; editable in Adobe Acrobat and other PDF viewers
+- **Digital Signatures** — PKCS#7 detached signatures with X.509 certificates; visible or invisible; optional RFC 3161 timestamping from built-in or custom TSA servers; HSM/smart card/cloud KMS support via custom signer delegate
 - **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) plus TrueType (.ttf) and OpenType (.otf) font embedding with full Unicode support including supplementary planes (CJK, Cyrillic, Greek, Arabic, CJK Extension B, enclosed alphanumerics, etc.). TrueType fonts are automatically subsetted to include only the glyphs used in the document
 - **Colors** — RGB, CMYK, grayscale, and spot colors (Separation) with CMYK fallback and tint control
 - **Page sizes** — A3, A4, A5, Letter, Legal, custom dimensions, landscape
@@ -78,9 +82,7 @@ See the full [Invoice example](#example-invoice-with-company-logo) and [CSV Tabl
 
 - HTML-to-PDF conversion
 - Right-to-left text layout (Arabic, Hebrew) or complex script shaping
-- Form fields (AcroForms)
 - PDF reading, parsing, or editing
-- Digital signatures
 - Automatic page layout (headers/footers, page numbers, flowing columns)
 
 ## Size Comparison
@@ -89,11 +91,11 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~120 KB** | **~120 KB** | **1x** | No |
-| **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 52x | No |
-| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 130x | No (BouncyCastle ~8 MB) |
-| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 313x | Yes (bundled Skia) |
-| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 2,174x | Yes (bundled Chromium) |
+| **SimpleTinyPDF** | **~161 KB** | **~161 KB** | **1x** | No |
+| **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 39x | No |
+| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 93x | No (BouncyCastle ~8 MB) |
+| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 224x | Yes (bundled Skia) |
+| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 1,553x | Yes (bundled Chromium) |
 
 PDFsharp is shown with MigraDoc (its document-model layer) since most real-world usage relies on MigraDoc for tables, paragraphs, and auto-pagination — raw PDFsharp alone is ~4.4 MB. IronPDF's footprint includes the Chromium rendering engine downloaded at build/runtime. QuestPDF bundles custom Skia native binaries for cross-platform rendering.
 
@@ -809,6 +811,192 @@ page.DrawBarcode("HELLO", BarcodeType.Code39, 300, 100, 200, 60,
 | `Rotation` | 0 | Clockwise rotation in degrees |
 | `Opacity` | 1.0 | 0.0 (transparent) to 1.0 (opaque) |
 
+### Form Fields (AcroForms)
+
+Add interactive form fields that users can fill in with Adobe Acrobat or other PDF viewers. Fields are editable — values persist when the user saves the PDF.
+
+```csharp
+var doc = new PdfDocument();
+var page = doc.AddPage();
+
+// Text field
+page.AddTextField("name", 100, 100, 200, 25, new TextFieldOptions
+{
+    Value = "John Doe",
+    FontSize = 12
+});
+
+// Multi-line text field
+page.AddTextField("notes", 100, 140, 200, 80, new TextFieldOptions
+{
+    MultiLine = true,
+    FontSize = 10
+});
+
+// Password field
+page.AddTextField("password", 100, 240, 200, 25, new TextFieldOptions
+{
+    Password = true
+});
+
+// Checkbox
+page.AddCheckbox("agree", 100, 280, 15, new CheckboxOptions
+{
+    Checked = true,
+    CheckColor = PdfColor.Blue
+});
+
+// Radio button group
+var group = doc.CreateRadioGroup("color", new RadioGroupOptions
+{
+    SelectedValue = "green"
+});
+page.AddRadioButton(group, "red", 100, 310, 12);
+page.AddRadioButton(group, "green", 100, 330, 12);
+page.AddRadioButton(group, "blue", 100, 350, 12);
+
+// Dropdown (combo box)
+page.AddDropdown("country", 100, 380, 200, 25,
+    new[] { "United States", "Canada", "United Kingdom" },
+    new DropdownOptions { SelectedValue = "Canada" });
+
+// Listbox (multi-select)
+page.AddListbox("colors", 100, 420, 200, 100,
+    new[] { "Red", "Green", "Blue", "Yellow" },
+    new ListboxOptions
+    {
+        SelectedValues = new[] { "Green", "Blue" },
+        MultiSelect = true
+    });
+
+// Push button
+page.AddButton("submit", "Submit", 100, 540, 100, 30);
+
+doc.Save("form.pdf");
+```
+
+**PdfPage methods:**
+
+| Method | Description |
+|---|---|
+| `AddTextField(name, x, y, w, h, options?)` | Single or multi-line text input |
+| `AddCheckbox(name, x, y, size, options?)` | Checkbox with checkmark |
+| `AddRadioButton(group, value, x, y, size)` | Radio button (use with `CreateRadioGroup`) |
+| `AddDropdown(name, x, y, w, h, items, options?)` | Dropdown / combo box |
+| `AddListbox(name, x, y, w, h, items, options?)` | Scrollable list (single or multi-select) |
+| `AddButton(name, label, x, y, w, h, options?)` | Push button |
+
+**PdfDocument methods:**
+
+| Method | Description |
+|---|---|
+| `CreateRadioGroup(name, options?)` | Create a radio button group. Returns `PdfRadioGroup` for use with `AddRadioButton`. |
+
+**Option classes** — all fields are optional with sensible defaults:
+
+| Class | Key Properties |
+|---|---|
+| `TextFieldOptions` | `Value`, `FontSize`, `MultiLine`, `Password`, `ReadOnly`, `Required`, `MaxLength`, `Alignment`, `TextColor`, `BackgroundColor`, `BorderColor` |
+| `CheckboxOptions` | `Checked`, `ExportValue`, `CheckColor`, `ReadOnly`, `Required`, `BackgroundColor`, `BorderColor` |
+| `RadioGroupOptions` | `SelectedValue`, `DotColor`, `ReadOnly`, `Required`, `BackgroundColor`, `BorderColor` |
+| `DropdownOptions` | `SelectedValue`, `FontSize`, `Editable`, `ReadOnly`, `Required`, `TextColor`, `BackgroundColor`, `BorderColor` |
+| `ListboxOptions` | `SelectedValues`, `FontSize`, `MultiSelect`, `ReadOnly`, `Required`, `TextColor`, `BackgroundColor`, `BorderColor` |
+| `ButtonOptions` | `FontSize`, `TextColor`, `BackgroundColor`, `BorderColor` |
+
+### Digital Signatures
+
+Sign PDF documents with X.509 certificates (PKCS#7 detached signatures). Signed documents display "Document has not been modified since this signature was applied" in Adobe Acrobat. Supports visible or invisible signatures, optional RFC 3161 timestamping, and external signing via HSM/smart card/cloud KMS delegates.
+
+```csharp
+using System.Security.Cryptography.X509Certificates;
+
+var doc = new PdfDocument();
+var page = doc.AddPage();
+page.DrawText("Signed document", 50, 50);
+
+// Invisible signature (no visual appearance)
+doc.Signature = new PdfSignatureOptions
+{
+    Certificate = new X509Certificate2("cert.pfx", "password"),
+    Reason = "Approval",
+    Location = "New York"
+};
+
+// Or load from file path
+doc.Signature = new PdfSignatureOptions
+{
+    CertificatePath = "cert.pfx",
+    CertificatePassword = "password"
+};
+
+doc.Save("signed.pdf");
+```
+
+**Visible signature** — displays signer name, date, reason, and location in a rectangle on the page:
+
+```csharp
+doc.Signature = new PdfSignatureOptions
+{
+    Certificate = cert,
+    Page = page,
+    X = 50, Y = 700,
+    Width = 200, Height = 60,
+    Reason = "Reviewed and approved",
+    Location = "New York"
+};
+```
+
+**RFC 3161 timestamping** — embeds a cryptographic timestamp from a trusted Time Stamp Authority, proving when the document was signed (instead of relying on the signer's local clock):
+
+```csharp
+doc.Signature = new PdfSignatureOptions
+{
+    Certificate = cert,
+    TimestampServer = TimestampServer.DigiCert  // or Sectigo, FreeTSA
+};
+
+// Or a custom TSA URL
+doc.Signature = new PdfSignatureOptions
+{
+    Certificate = cert,
+    TimestampServerUrl = "http://timestamp.example.com/tsa"
+};
+```
+
+**Custom signer** — for HSM, smart card, or cloud KMS scenarios where the private key is not directly accessible:
+
+```csharp
+doc.Signature = new PdfSignatureOptions
+{
+    Certificate = cert,  // public key only — private key not used
+    CustomSigner = (dataToSign) =>
+    {
+        // Sign with your HSM/KMS and return PKCS#1 v1.5 RSA signature bytes
+        return myHsm.Sign(dataToSign);
+    }
+};
+```
+
+**PdfSignatureOptions:**
+
+| Property | Default | Description |
+|---|---|---|
+| `Certificate` | required | `X509Certificate2` with private key (or public key only when using `CustomSigner`) |
+| `CertificatePath` | null | Path to a PKCS#12 (.pfx/.p12) file (alternative to `Certificate`) |
+| `CertificatePassword` | null | Password for the PKCS#12 file |
+| `CustomSigner` | null | External signing delegate for HSM/smart card/cloud KMS |
+| `Reason` | null | Reason for signing |
+| `Location` | null | Location where the document was signed |
+| `ContactInfo` | null | Contact information of the signer |
+| `HashAlgorithm` | SHA256 | Hash algorithm (`SHA256`, `SHA384`, `SHA512`) |
+| `Page` | null | Page for visible signature (null = invisible) |
+| `X`, `Y` | 0 | Position of visible signature rectangle |
+| `Width` | 150 | Width of visible signature rectangle |
+| `Height` | 50 | Height of visible signature rectangle |
+| `AdditionalCertificates` | null | Intermediate CA certificates to include in the PKCS#7 structure |
+| `TimestampServer` | `None` | Built-in TSA: `None`, `DigiCert`, `Sectigo`, `FreeTSA` |
+| `TimestampServerUrl` | null | Custom RFC 3161 TSA URL |
+
 ## Example: Invoice with Company Logo
 
 ![Invoice example output](docs/example-invoice.png)
@@ -942,8 +1130,8 @@ doc.Save("sales-report.pdf");
 
 | Version | Date | Changes |
 |---|---|---|
-| 0.59 | June 2, 2026 | Add character spacing, full justification (`TextAlignment.Justify`), and faux bold/italic for any font. Character spacing uses the PDF `Tc` operator. Faux bold uses fill+stroke rendering (`Tr 2`). Faux italic applies a 12° text matrix shear. All features work with both built-in and custom fonts, in single-line, wrapped, and rich text modes. |
-| 0.58 | June 2, 2026 | Add spot color (Separation) support with named inks, CMYK display fallback, and tint control. Spot colors work everywhere `PdfColor` is accepted. |
+| 0.60 | June 8, 2026 | Add interactive form fields (AcroForms): text fields (single/multi-line, password), checkboxes, radio buttons, dropdowns, listboxes (single/multi-select), and push buttons. Fields are editable in Adobe Acrobat and other PDF viewers. Add PKCS#7 digital signatures with X.509 certificates. Visible and invisible signatures, SHA-256/384/512, optional RFC 3161 timestamping (DigiCert, Sectigo, FreeTSA, or custom URL), intermediate CA certificate chains, and custom signer delegate for HSM/smart card/cloud KMS.|
+| 0.58 | June 5, 2026 | Add character spacing, full justification (`TextAlignment.Justify`), and faux bold/italic for any font. Character spacing uses the PDF `Tc` operator. Faux bold uses fill+stroke rendering (`Tr 2`). Faux italic applies a 12° text matrix shear. All features work with both built-in and custom fonts, in single-line, wrapped, and rich text modes. Add spot color (Separation) support with named inks, CMYK display fallback, and tint control. Spot colors work everywhere `PdfColor` is accepted. |
 | 0.57 | May 31, 2026 | Add TrueType font subsetting — only used glyphs are embedded, dramatically reducing PDF size for large fonts (especially CJK). Composite glyph dependencies are resolved automatically. CFF/OpenType fonts continue to embed in full. |
 | 0.56 | May 29, 2026 | Add AES-128 and AES-256 PDF encryption with user/owner passwords and permission flags. Pure C# implementation using built-in System.Security.Cryptography. |
 | 0.55 | May 22, 2026 | Add annotations: text (sticky notes), markup (highlight, underline, strikeout), stamps (14 predefined types), and internal links (GoTo page navigation). |
