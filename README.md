@@ -2,7 +2,7 @@
 
 [![NuGet](https://img.shields.io/nuget/v/SimpleTinyPDF)](https://www.nuget.org/packages/SimpleTinyPDF)
 
-A small-but-mighty zero-dependency PDF generation library for .NET.  It is faster and uses less memory than most alternative packages.  SimpleTinyPDF acheives these results by not trying to do everything, but there's a good chance it does what you need!
+A small-but-mighty zero-dependency PDF generation library for .NET.  It is faster and uses less memory than most alternative packages.  SimpleTinyPDF acheives these impressive results by not doing everything... but there's a good chance it does what you need!
 
  SimpleTinyPDF targets .NET Standard 2.0, so it works with .NET Framework 4.6.1+, .NET Core 2.0+, and .NET 5+. 
 
@@ -18,6 +18,7 @@ A small-but-mighty zero-dependency PDF generation library for .NET.  It is faste
   - [PdfPage](#pdfpage) — [Text](#text) · [Shapes](#shapes) · [Images](#images) · [Tables](#tables) · [Lists](#lists)
   - [PdfColor](#pdfcolor)
   - [PageSize](#pagesize)
+  - [PdfUnit](#pdfunit)
   - [Bookmarks](#bookmarks)
   - [Annotations](#annotations)
   - [Encryption](#encryption)
@@ -44,6 +45,7 @@ A small-but-mighty zero-dependency PDF generation library for .NET.  It is faste
 - **Digital Signatures** — PKCS#7 detached signatures with X.509 certificates; visible or invisible; optional RFC 3161 timestamping from built-in or custom TSA servers; HSM/smart card/cloud KMS support via custom signer delegate
 - **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) plus TrueType (.ttf) and OpenType (.otf) font embedding with full Unicode support including supplementary planes (CJK, Cyrillic, Greek, Arabic, CJK Extension B, enclosed alphanumerics, etc.). TrueType fonts are automatically subsetted to include only the glyphs used in the document
 - **Colors** — RGB, CMYK, grayscale, and spot colors (Separation) with CMYK fallback and tint control
+- **Unit conversion** — convert between points, inches, centimeters, and millimeters; fractional inch support ("1-1/8", "1 1/8", "3/4")
 - **Page sizes** — A3, A4, A5, Letter, Legal, custom dimensions, landscape
 - **Coordinates** — top-down (default) or native PDF bottom-up
 - **Metadata** — document title and author
@@ -588,6 +590,43 @@ var landscape = PageSize.A4.Landscape();
 var custom = new PageSize(400, 600);  // width x height in points
 ```
 
+### PdfUnit
+
+Convert between PDF points and common measurement units. PDF uses points as its native unit (72 points = 1 inch).
+
+```csharp
+// Inches, centimeters, millimeters → points
+float x = PdfUnit.InchesToPoints(2.5f);    // 180
+float y = PdfUnit.CmToPoints(10f);         // 283.46
+float w = PdfUnit.MmToPoints(50f);         // 141.73
+
+// Points → other units
+float inches = PdfUnit.PointsToInches(72f);  // 1.0
+float cm     = PdfUnit.PointsToCm(72f);      // 2.54
+float mm     = PdfUnit.PointsToMm(72f);      // 25.4
+
+// Fractional inches — great for imperial measurements
+float a = PdfUnit.InchesToPoints("1-1/8");   // 81  (hyphen separator)
+float b = PdfUnit.InchesToPoints("1 1/8");   // 81  (space separator)
+float c = PdfUnit.InchesToPoints("3/4");     // 54  (fraction only)
+float d = PdfUnit.InchesToPoints(1, 1, 8);   // 81  (whole, numerator, denominator)
+
+// Parse fractional inches to a float value
+float val = PdfUnit.ParseInches("1-1/8");    // 1.125
+```
+
+| Method | Description |
+|---|---|
+| `InchesToPoints(float)` | Convert inches to points |
+| `PointsToInches(float)` | Convert points to inches |
+| `CmToPoints(float)` | Convert centimeters to points |
+| `PointsToCm(float)` | Convert points to centimeters |
+| `MmToPoints(float)` | Convert millimeters to points |
+| `PointsToMm(float)` | Convert points to millimeters |
+| `InchesToPoints(string)` | Parse fractional inches (e.g. "1-1/8") and convert to points |
+| `InchesToPoints(int, int, int)` | Convert whole + fraction (numerator/denominator) inches to points |
+| `ParseInches(string)` | Parse fractional inches string to a float value in inches |
+
 ### Bookmarks
 
 Add bookmarks (outlines) that appear in the PDF viewer's navigation panel. Bookmarks can be nested to create a hierarchical table of contents.
@@ -1130,6 +1169,7 @@ doc.Save("sales-report.pdf");
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.61 | June 13, 2026 | Add `PdfUnit` static class for converting between PDF points and inches, centimeters, and millimeters. Includes fractional inch support via string parsing ("1-1/8", "1 1/8", "3/4") and explicit whole/numerator/denominator parameters. |
 | 0.60 | June 8, 2026 | Add interactive form fields (AcroForms): text fields (single/multi-line, password), checkboxes, radio buttons, dropdowns, listboxes (single/multi-select), and push buttons. Fields are editable in Adobe Acrobat and other PDF viewers. Add PKCS#7 digital signatures with X.509 certificates. Visible and invisible signatures, SHA-256/384/512, optional RFC 3161 timestamping (DigiCert, Sectigo, FreeTSA, or custom URL), intermediate CA certificate chains, and custom signer delegate for HSM/smart card/cloud KMS.|
 | 0.58 | June 5, 2026 | Add character spacing, full justification (`TextAlignment.Justify`), and faux bold/italic for any font. Character spacing uses the PDF `Tc` operator. Faux bold uses fill+stroke rendering (`Tr 2`). Faux italic applies a 12° text matrix shear. All features work with both built-in and custom fonts, in single-line, wrapped, and rich text modes. Add spot color (Separation) support with named inks, CMYK display fallback, and tint control. Spot colors work everywhere `PdfColor` is accepted. |
 | 0.57 | May 31, 2026 | Add TrueType font subsetting — only used glyphs are embedded, dramatically reducing PDF size for large fonts (especially CJK). Composite glyph dependencies are resolved automatically. CFF/OpenType fonts continue to embed in full. |
