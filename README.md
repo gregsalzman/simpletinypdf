@@ -2,7 +2,7 @@
 
 [![NuGet](https://img.shields.io/nuget/v/SimpleTinyPDF)](https://www.nuget.org/packages/SimpleTinyPDF)
 
-A small-but-mighty zero-dependency PDF generation library for .NET.  It is faster and uses less memory than most alternative packages.  SimpleTinyPDF acheives these impressive results by not doing everything... but there's a good chance it does what you need!
+A small-but-mighty zero-dependency PDF generation library for .NET.  It is faster and uses less memory than most alternative packages.  SimpleTinyPDF acheives these impressive results by not doing everything... but there's still a good chance it does what you need!
 
  SimpleTinyPDF targets .NET Standard 2.0, so it works with .NET Framework 4.6.1+, .NET Core 2.0+, and .NET 5+. 
 
@@ -16,6 +16,7 @@ A small-but-mighty zero-dependency PDF generation library for .NET.  It is faste
 - [API Reference](#api-reference)
   - [PdfDocument](#pdfdocument)
   - [PdfPage](#pdfpage) — [Text](#text) · [Shapes](#shapes) · [Images](#images) · [Tables](#tables) · [Lists](#lists)
+  - [Document Layout](#document-layout)
   - [PdfColor](#pdfcolor)
   - [PageSize](#pagesize)
   - [PdfUnit](#pdfunit)
@@ -36,6 +37,7 @@ A small-but-mighty zero-dependency PDF generation library for .NET.  It is faste
 - **Images** — JPEG and PNG (with transparency), EXIF auto-orientation, scaling modes (Stretch, Fit, Fill), opacity
 - **Tables** — styled headers, column alignment, alternate row shading, auto-pagination with repeated headers, CSV import
 - **Barcodes** — Code 128, Code 39, EAN-13, UPC-A, and QR Code; pure vector rendering (no images); configurable colors, quiet zones, human-readable text, rotation, and opacity
+- **Document Layout** — automatic content flow and pagination via `PdfDocumentLayout`. Add paragraphs, rich text, images, tables, and lists that flow across pages automatically. Headers and footers with page numbering (including accurate total page counts via two-pass rendering), first-page and even-page overrides, tab stops with leaders and decimal alignment, and manual page breaks
 - **Lists** — bullet, numbered, lowercase Roman (i, ii, iii…), and uppercase Roman (I, II, III…); unlimited nesting with per-level style overrides and custom bullet symbols; automatic text wrapping and multi-page flow
 - **Shapes** — lines, rectangles (stroke and/or fill), with optional rotation
 - **Bookmarks** — hierarchical outline / table of contents
@@ -85,7 +87,6 @@ See the full [Invoice example](#example-invoice-with-company-logo) and [CSV Tabl
 - HTML-to-PDF conversion
 - Right-to-left text layout (Arabic, Hebrew) or complex script shaping
 - PDF reading, parsing, or editing
-- Automatic page layout (headers/footers, page numbers, flowing columns)
 
 ## Size Comparison
 
@@ -93,11 +94,11 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~161 KB** | **~161 KB** | **1x** | No |
-| **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 39x | No |
-| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 93x | No (BouncyCastle ~8 MB) |
-| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 224x | Yes (bundled Skia) |
-| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 1,553x | Yes (bundled Chromium) |
+| **SimpleTinyPDF** | **~192 KB** | **~192 KB** | **1x** | No |
+| **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 32x | No |
+| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 73x | No (BouncyCastle ~8 MB) |
+| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 188x | Yes (bundled Skia) |
+| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 1,302x | Yes (bundled Chromium) |
 
 PDFsharp is shown with MigraDoc (its document-model layer) since most real-world usage relies on MigraDoc for tables, paragraphs, and auto-pagination — raw PDFsharp alone is ~4.4 MB. IronPDF's footprint includes the Chromium rendering engine downloaded at build/runtime. QuestPDF bundles custom Skia native binaries for cross-platform rendering.
 
@@ -125,7 +126,16 @@ Benchmarked with [BenchmarkDotNet](https://benchmarkdotnet.org/) on Windows 11, 
 | **QuestPDF** 2026.5 | 975 ms | 224 MB | 9x slower |
 | **IronPDF** 2026.5 | N/A | N/A | — |
 
-SimpleTinyPDF is the fastest library in both scenarios while offering a high-level API (built-in tables, CSV import, auto-pagination). QuestPDF is closest in the invoice scenario but allocates 3x more memory. MigraDoc and iText provide richer layout engines but are 7–43x slower with 5–11x more memory allocation.
+**Scenario 3 — Multi-page flowing report** (50 paragraphs with chapter headings, headers/footers with page numbers, summary table):
+
+| Library | Mean | Allocated | vs SimpleTinyPDF |
+|---|---|---|---|
+| **SimpleTinyPDF** (Layout) | **1.055 ms** | **1,753 KB** | **1x** |
+| **PDFsharp + MigraDoc** 6.2.4 | 13.513 ms | 19,465 KB | 13x slower |
+| **QuestPDF** 2026.5 | 18.347 ms | 838 KB | 17x slower |
+| **IronPDF** 2026.5 | N/A | N/A | — |
+
+SimpleTinyPDF is the fastest library in all three scenarios. In the layout report benchmark (Scenario 3), SimpleTinyPDF's new `PdfDocumentLayout` engine is 13x faster than MigraDoc and 17x faster than QuestPDF while using a fraction of the memory compared to MigraDoc. QuestPDF achieves lower memory allocation but is significantly slower. In the data-heavy scenarios (1 and 2), SimpleTinyPDF leads by 7–43x in speed with substantially lower memory allocation.
 
 ## API Reference
 
@@ -1036,6 +1046,221 @@ doc.Signature = new PdfSignatureOptions
 | `TimestampServer` | `None` | Built-in TSA: `None`, `DigiCert`, `Sectigo`, `FreeTSA` |
 | `TimestampServerUrl` | null | Custom RFC 3161 TSA URL |
 
+### Document Layout
+
+`PdfDocumentLayout` provides automatic content flow, pagination, headers/footers with page numbering, and two-pass rendering for accurate total page counts. Add paragraphs, rich text, images, tables, and lists — content flows across pages automatically.
+
+**Basic report:**
+
+```csharp
+using SimpleTinyPDF;
+
+var layout = new PdfDocumentLayout();
+layout.PageSize = PageSize.Letter;
+layout.Margins = new PdfMargins(72);  // 1 inch on all sides
+
+// Headers and footers with page numbers
+layout.HeaderFooter.Header = (page, ctx) =>
+{
+    page.DrawText("Monthly Report", page.Width / 2, 30,
+        PdfFont.HelveticaBold, 9, PdfColor.DarkGray, TextAlignment.Center);
+    page.DrawLine(72, 45, page.Width - 72, 45, PdfColor.LightGray);
+};
+layout.HeaderFooter.Footer = (page, ctx) =>
+{
+    page.DrawText($"Page {ctx.PageNumber} of {ctx.TotalPages}",
+        page.Width / 2, page.Height - 35,
+        PdfFont.Helvetica, 8, PdfColor.DarkGray, TextAlignment.Center);
+};
+
+// Title
+layout.AddParagraph("Monthly Performance Report", new ParagraphOptions
+{
+    Font = PdfFont.HelveticaBold, FontSize = 22,
+    Alignment = TextAlignment.Center, SpaceAfter = 20
+});
+
+// Body paragraphs — automatically flow across pages
+layout.AddParagraph("Lorem ipsum dolor sit amet...", new ParagraphOptions
+{
+    SpaceAfter = 6
+});
+
+// Section heading
+layout.AddParagraph("Financial Summary", new ParagraphOptions
+{
+    Font = PdfFont.HelveticaBold, FontSize = 16,
+    SpaceBefore = 15, SpaceAfter = 8
+});
+
+// Tables flow across pages with repeated headers
+var table = new PdfTable(150, 100, 100, 100)
+    .SetHeaders("Quarter", "Revenue", "Expenses", "Profit")
+    .AddRow("Q1", "$1.2M", "$0.9M", "$0.3M")
+    .AddRow("Q2", "$1.5M", "$1.0M", "$0.5M");
+table.HeaderBackground = PdfColor.Rgb(51, 51, 51);
+table.HeaderTextColor = PdfColor.White;
+layout.AddTable(table);
+
+// Save
+layout.Save("report.pdf");
+```
+
+**Rich text, images, lists, and page breaks:**
+
+```csharp
+// Rich text paragraphs
+layout.AddParagraph(new[] {
+    new TextSpan("Important: ", PdfFont.HelveticaBold, 12, PdfColor.Red),
+    new TextSpan("This section contains critical information.")
+}, new ParagraphOptions { SpaceAfter = 10 });
+
+// Images
+var logo = PdfImage.FromFile("chart.png");
+layout.AddImage(logo, new ImageOptions
+{
+    Width = 300, Height = 200,
+    Alignment = TextAlignment.Center,
+    SpaceAfter = 10
+});
+
+// Lists
+layout.AddList(new[] {
+    new ListItem("First item"),
+    new ListItem("Second item",
+        new ListItem("Nested item")),
+    new ListItem("Third item")
+}, ListStyle.Numbered);
+
+// Manual page break
+layout.AddPageBreak();
+```
+
+**First-page and even-page header/footer overrides:**
+
+```csharp
+layout.HeaderFooter.FirstPageHeader = (page, ctx) =>
+{
+    page.DrawText("COVER PAGE", page.Width / 2, 30,
+        PdfFont.HelveticaBold, 14, TextAlignment.Center);
+};
+layout.HeaderFooter.EvenPageHeader = (page, ctx) =>
+{
+    page.DrawText("Report — Even Page", 72, 30, PdfFont.Helvetica, 9);
+};
+```
+
+**Wrapping an existing document:**
+
+```csharp
+var doc = new PdfDocument { Title = "My Report", Author = "Jane Doe" };
+var layout = new PdfDocumentLayout(doc);  // layout pages are appended
+layout.AddParagraph("Content...");
+layout.Save("output.pdf");
+```
+
+**PdfDocumentLayout:**
+
+| Property / Method | Description |
+|---|---|
+| `PageSize` | Page size for new pages (default A4) |
+| `Margins` | Page margins (default 72pt / 1 inch all sides) |
+| `HeaderFooter` | Header and footer configuration |
+| `DefaultParagraphOptions` | Default options applied to paragraphs without explicit options |
+| `Document` | The underlying `PdfDocument` (available after `Generate`) |
+| `AddParagraph(text, options?)` | Add a plain-text paragraph |
+| `AddParagraph(spans, options?)` | Add a rich-text paragraph |
+| `AddImage(image, options?)` | Add an image at the current flow position |
+| `AddTable(table)` | Add a table at the current flow position |
+| `AddList(items, style?)` | Add a list at the current flow position |
+| `AddPageBreak()` | Force a page break |
+| `Generate()` | Render all elements and return the `PdfDocument` |
+| `Save(string)` / `Save(Stream)` | Generate and save to file or stream |
+| `ToArray()` | Generate and return PDF as byte array |
+
+**PdfMargins:**
+
+```csharp
+new PdfMargins(72)              // 72pt on all sides
+new PdfMargins(72, 54)          // 72pt top/bottom, 54pt left/right
+new PdfMargins(72, 54, 72, 54)  // top, right, bottom, left
+```
+
+**HeaderFooterOptions:**
+
+| Property | Default | Description |
+|---|---|---|
+| `Header` | null | Header callback for every page (unless overridden) |
+| `Footer` | null | Footer callback for every page (unless overridden) |
+| `FirstPageHeader` | null | Header for the first page only |
+| `FirstPageFooter` | null | Footer for the first page only |
+| `EvenPageHeader` | null | Header for even-numbered pages |
+| `EvenPageFooter` | null | Footer for even-numbered pages |
+| `HeaderDistance` | 36 | Distance from top edge where headers are drawn (points) |
+| `FooterDistance` | 36 | Distance from bottom edge where footers are drawn (points) |
+
+Each callback receives the `PdfPage` and a `PageContext` with:
+
+| Property | Description |
+|---|---|
+| `PageNumber` | Current page number (1-based) |
+| `TotalPages` | Total number of pages (accurate via two-pass rendering) |
+| `IsFirstPage` | True if this is the first page |
+| `IsEvenPage` | True if the page number is even |
+
+**ParagraphOptions:**
+
+| Property | Default | Description |
+|---|---|---|
+| `Font` | Helvetica | Font (built-in `PdfFont` or custom `PdfFontSource`) |
+| `FontSize` | 12 | Font size in points |
+| `Color` | Black | Text color |
+| `Alignment` | Left | `Left`, `Center`, `Right`, or `Justify` |
+| `LineSpacing` | 1.2 | Line spacing multiplier |
+| `SpaceBefore` | 0 | Space before the paragraph in points |
+| `SpaceAfter` | 0 | Space after the paragraph in points |
+| `Underline` | false | Underline text |
+| `Bold` | false | Faux bold effect |
+| `Italic` | false | Faux italic effect |
+| `CharacterSpacing` | 0 | Extra space between characters in points |
+| `Opacity` | 1.0 | Text opacity (0.0–1.0) |
+| `TabStops` | null | Tab stop definitions for tab-delimited text |
+
+**ImageOptions:**
+
+| Property | Default | Description |
+|---|---|---|
+| `Width` | null | Display width in points (auto-calculated if null) |
+| `Height` | null | Display height in points (auto-calculated if null) |
+| `SpaceBefore` | 0 | Space before the image in points |
+| `SpaceAfter` | 0 | Space after the image in points |
+| `Alignment` | Left | Horizontal alignment (`Left`, `Center`, `Right`) |
+| `Opacity` | 1.0 | Image opacity (0.0–1.0) |
+| `ScaleMode` | Fit | How the image is scaled within its bounds |
+
+**TabStop:**
+
+Tab stops control alignment of tab-delimited text within paragraphs.
+
+```csharp
+layout.AddParagraph("Item\t$100.00\tPaid", new ParagraphOptions
+{
+    TabStops = new[]
+    {
+        new TabStop(200, TabAlignment.Left),
+        new TabStop(350, TabAlignment.Right),
+        new TabStop(450, TabAlignment.Center, leader: '.')  // dot leader
+    }
+});
+```
+
+| `TabAlignment` | Description |
+|---|---|
+| `Left` | Text starts at the tab position |
+| `Center` | Text is centered at the tab position |
+| `Right` | Text ends at the tab position |
+| `Decimal` | The decimal point aligns at the tab position |
+
 ## Example: Invoice with Company Logo
 
 ![Invoice example output](docs/example-invoice.png)
@@ -1165,10 +1390,11 @@ page.DrawTable(table, 50, 100, bottomMargin: 50, continuationY: 50);
 doc.Save("sales-report.pdf");
 ```
 
-## Version History
+<!-- ## Version History -->
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.70 | June 23, 2026 | Add high-level document layout engine (`PdfDocumentLayout`) with automatic content flow, pagination, headers/footers with page numbering, tab stops, and two-pass rendering for accurate total page counts. Supports paragraphs, rich text, images, tables, lists, and manual page breaks in a flowing layout. |
 | 0.61 | June 13, 2026 | Add `PdfUnit` static class for converting between PDF points and inches, centimeters, and millimeters. Includes fractional inch support via string parsing ("1-1/8", "1 1/8", "3/4") and explicit whole/numerator/denominator parameters. |
 | 0.60 | June 8, 2026 | Add interactive form fields (AcroForms): text fields (single/multi-line, password), checkboxes, radio buttons, dropdowns, listboxes (single/multi-select), and push buttons. Fields are editable in Adobe Acrobat and other PDF viewers. Add PKCS#7 digital signatures with X.509 certificates. Visible and invisible signatures, SHA-256/384/512, optional RFC 3161 timestamping (DigiCert, Sectigo, FreeTSA, or custom URL), intermediate CA certificate chains, and custom signer delegate for HSM/smart card/cloud KMS.|
 | 0.58 | June 5, 2026 | Add character spacing, full justification (`TextAlignment.Justify`), and faux bold/italic for any font. Character spacing uses the PDF `Tc` operator. Faux bold uses fill+stroke rendering (`Tr 2`). Faux italic applies a 12° text matrix shear. All features work with both built-in and custom fonts, in single-line, wrapped, and rich text modes. Add spot color (Separation) support with named inks, CMYK display fallback, and tint control. Spot colors work everywhere `PdfColor` is accepted. |
