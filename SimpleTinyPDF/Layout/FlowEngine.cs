@@ -6,93 +6,296 @@ namespace SimpleTinyPDF
     internal class FlowEngine
     {
         private readonly PdfDocument _doc;
-        private readonly PageSize _pageSize;
-        private readonly PdfMargins _margins;
-        private readonly HeaderFooterOptions _headerFooter;
+        private readonly PageSize _defaultPageSize;
+        private readonly PdfMargins _defaultMargins;
+        private readonly HeaderFooterOptions _defaultHeaderFooter;
         private readonly ParagraphOptions _defaultOptions;
         private readonly int _totalPages;
+        private readonly List<object> _eventHandlers;
+        private readonly CustomRenderer _renderer;
+        private readonly int[] _sectionTotalPages;
+
+        // Current section settings (resolved from section options + defaults)
+        private PageSize _pageSize;
+        private PdfMargins _margins;
+        private HeaderFooterOptions _headerFooter;
+        private ColumnFlowEngine _columns;
 
         private PdfPage _currentPage;
         private float _currentY;
+        private float _columnY; // Y position at top of column (for column resets)
         private int _pageNumber;
+        private int _sectionIndex;
+        private int _sectionPageNumber;
         private float _contentLeft;
         private float _contentWidth;
         private float _contentBottom;
         private bool _pageStarted;
 
         internal FlowEngine(PdfDocument doc, PageSize pageSize, PdfMargins margins,
-            HeaderFooterOptions headerFooter, ParagraphOptions defaultOptions, int totalPages)
+            HeaderFooterOptions headerFooter, ParagraphOptions defaultOptions, int totalPages,
+            List<object> eventHandlers = null, CustomRenderer renderer = null,
+            int[] sectionTotalPages = null)
         {
             _doc = doc;
-            _pageSize = pageSize ?? PageSize.A4;
-            _margins = margins ?? new PdfMargins(72);
-            _headerFooter = headerFooter ?? new HeaderFooterOptions();
+            _defaultPageSize = pageSize ?? PageSize.A4;
+            _defaultMargins = margins ?? new PdfMargins(72);
+            _defaultHeaderFooter = headerFooter ?? new HeaderFooterOptions();
             _defaultOptions = defaultOptions;
             _totalPages = totalPages;
+            _eventHandlers = eventHandlers ?? new List<object>();
+            _renderer = renderer;
+            _sectionTotalPages = sectionTotalPages;
+
+            // Initialize with defaults for implicit first section
+            _pageSize = _defaultPageSize;
+            _margins = _defaultMargins;
+            _headerFooter = _defaultHeaderFooter;
         }
 
-        internal int Render(IReadOnlyList<LayoutElement> elements)
-        {
-            if (elements.Count == 0) return 0;
+        private bool _sectionStarted;
 
-            StartNewPage();
+        private void EnsurePageStarted()
+        {
+            if (!_pageStarted)
+            {
+                StartNewPage();
+                if (!_sectionStarted)
+                {
+                    _sectionStarted = true;
+                    FireEvent(PageEventType.SectionStarted);
+                }
+            }
+        }
+
+        internal RenderResult Render(IReadOnlyList<LayoutElement> elements)
+        {
+            if (elements.Count == 0) return new RenderResult(0, new int[0]);
+
+            var sectionPageCounts = new List<int>();
+            _sectionIndex = 0;
+            _sectionPageNumber = 0;
 
             foreach (var element in elements)
             {
                 switch (element.Type)
                 {
                     case LayoutElementType.Paragraph:
+                        EnsurePageStarted();
                         RenderParagraph(element);
                         break;
                     case LayoutElementType.RichParagraph:
+                        EnsurePageStarted();
                         RenderRichParagraph(element);
                         break;
                     case LayoutElementType.Image:
+                        EnsurePageStarted();
                         RenderImage(element);
                         break;
                     case LayoutElementType.Table:
+                        EnsurePageStarted();
                         RenderTable(element);
                         break;
                     case LayoutElementType.List:
+                        EnsurePageStarted();
                         RenderList(element);
                         break;
                     case LayoutElementType.PageBreak:
+                        EnsurePageStarted();
                         StartNewPage();
+                        break;
+                    case LayoutElementType.SectionBreak:
+                        // Finish current section if it was started
+                        if (_sectionStarted)
+                        {
+                            DrawFooterOnCurrentPage();
+                            FireEvent(PageEventType.PageFinished);
+                            FireEvent(PageEventType.SectionFinished);
+                            sectionPageCounts.Add(_sectionPageNumber);
+                            _pageStarted = false;
+                        }
+                        else
+                        {
+                            // No pages rendered yet for implicit first section
+                            sectionPageCounts.Add(0);
+                        }
+
+                        // Start new section
+                        _sectionIndex++;
+                        _sectionStarted = false;
+                        ApplySectionOptions(element.SectionOptions);
+                        break;
+                    case LayoutElementType.ColumnBreak:
+                        EnsurePageStarted();
+                        HandleColumnBreak();
                         break;
                 }
             }
 
-            DrawFooterOnCurrentPage();
-            return _pageNumber;
+            if (_pageStarted)
+            {
+                DrawFooterOnCurrentPage();
+                FireEvent(PageEventType.PageFinished);
+            }
+            if (_sectionStarted)
+                FireEvent(PageEventType.SectionFinished);
+            sectionPageCounts.Add(_sectionPageNumber);
+
+            return new RenderResult(_pageNumber, sectionPageCounts.ToArray());
+        }
+
+        private void ApplySectionOptions(SectionOptions options)
+        {
+            _pageSize = options.PageSize ?? _defaultPageSize;
+            _margins = options.Margins ?? _defaultMargins;
+            _headerFooter = options.HeaderFooter ?? _defaultHeaderFooter;
+
+            if (options.RestartPageNumbers)
+                _sectionPageNumber = 0;
+
+            if (options.ColumnCount > 1)
+            {
+                float totalWidth = _pageSize.Width - _margins.Left - _margins.Right;
+                _columns = new ColumnFlowEngine(options.ColumnCount, options.ColumnGap,
+                    _margins.Left, totalWidth);
+            }
+            else
+            {
+                _columns = null;
+            }
+        }
+
+        private void HandleColumnBreak()
+        {
+            if (_columns == null)
+            {
+                // No columns — treat as page break
+                StartNewPage();
+                return;
+            }
+
+            if (_columns.NextColumn())
+            {
+                // Moved to next column on same page — reset Y to column top
+                _currentY = _columnY;
+                UpdateContentBoundsForColumn();
+            }
+            else
+            {
+                // Was on last column — new page
+                StartNewPage();
+            }
         }
 
         private void StartNewPage()
         {
             if (_pageStarted)
+            {
                 DrawFooterOnCurrentPage();
+                FireEvent(PageEventType.PageFinished);
+            }
 
             _currentPage = _doc.AddPage(_pageSize);
             _pageNumber++;
+            _sectionPageNumber++;
             _pageStarted = true;
 
-            _contentLeft = _margins.Left;
-            _contentWidth = _currentPage.Width - _margins.Left - _margins.Right;
             _contentBottom = _currentPage.Height - _margins.Bottom;
             _currentY = _margins.Top;
+            _columnY = _margins.Top;
+
+            if (_columns != null)
+            {
+                _columns.Reset();
+                UpdateContentBoundsForColumn();
+            }
+            else
+            {
+                _contentLeft = _margins.Left;
+                _contentWidth = _currentPage.Width - _margins.Left - _margins.Right;
+            }
 
             DrawHeaderOnPage(_currentPage, _pageNumber);
+            FireEvent(PageEventType.PageCreated);
+        }
+
+        private void UpdateContentBoundsForColumn()
+        {
+            _contentLeft = _columns.ColumnX;
+            _contentWidth = _columns.ColumnWidth;
         }
 
         private void EnsureSpace(float height)
         {
+            // Custom renderer override
+            if (_renderer != null)
+            {
+                float remaining = _contentBottom - _currentY;
+                bool? custom = _renderer.ShouldBreakPage(remaining, height, MakeContext());
+                if (custom.HasValue)
+                {
+                    if (custom.Value)
+                    {
+                        if (_columns != null && _columns.NextColumn())
+                        {
+                            _currentY = _columnY;
+                            UpdateContentBoundsForColumn();
+                        }
+                        else
+                        {
+                            if (_columns != null) _columns.Reset();
+                            StartNewPage();
+                        }
+                    }
+                    return;
+                }
+            }
+
             if (_currentY + height > _contentBottom)
-                StartNewPage();
+            {
+                if (_columns != null && _columns.NextColumn())
+                {
+                    _currentY = _columnY;
+                    UpdateContentBoundsForColumn();
+                }
+                else
+                {
+                    StartNewPage();
+                }
+            }
+        }
+
+        // ── Events ──────────────────────────────────────────────────
+
+        private void FireEvent(PageEventType eventType)
+        {
+            if (_eventHandlers.Count == 0) return;
+
+            var ctx = MakeContext();
+            foreach (var handler in _eventHandlers)
+            {
+                if (handler is Action<PageEventType, PdfPage, PageContext> action)
+                    action(eventType, _currentPage, ctx);
+                else if (handler is IPageEventHandler iHandler)
+                    iHandler.HandleEvent(eventType, _currentPage, ctx);
+            }
         }
 
         // ── Header / Footer ────────────────────────────────────────
 
+        private PageContext MakeContext() => MakeContext(_pageNumber);
+
         private PageContext MakeContext(int pageNumber) =>
-            new PageContext { PageNumber = pageNumber, TotalPages = _totalPages };
+            new PageContext
+            {
+                PageNumber = pageNumber,
+                TotalPages = _totalPages,
+                SectionPageNumber = _sectionPageNumber,
+                SectionTotalPages = _sectionTotalPages != null && _sectionIndex < _sectionTotalPages.Length
+                    ? _sectionTotalPages[_sectionIndex]
+                    : 0,
+                SectionIndex = _sectionIndex
+            };
 
         private void DrawHeaderOnPage(PdfPage page, int pageNumber)
         {
@@ -144,6 +347,21 @@ namespace SimpleTinyPDF
         private void RenderParagraph(LayoutElement element)
         {
             var opts = EffectiveOptions(element.ParagraphOptions);
+
+            // Custom renderer override
+            if (_renderer != null)
+            {
+                _currentY += opts.SpaceBefore;
+                float? customY = _renderer.RenderParagraph(_currentPage, element.Text ?? "",
+                    _contentLeft, _currentY, _contentWidth, opts, MakeContext());
+                if (customY.HasValue)
+                {
+                    _currentY = customY.Value + opts.SpaceAfter;
+                    return;
+                }
+                _currentY -= opts.SpaceBefore; // undo — default will handle it
+            }
+
             var font = EffectiveFont(opts);
             var text = element.Text ?? "";
 
@@ -249,6 +467,21 @@ namespace SimpleTinyPDF
         private void RenderRichParagraph(LayoutElement element)
         {
             var opts = EffectiveOptions(element.ParagraphOptions);
+
+            // Custom renderer override
+            if (_renderer != null)
+            {
+                _currentY += opts.SpaceBefore;
+                float? customY = _renderer.RenderRichParagraph(_currentPage, element.Spans,
+                    _contentLeft, _currentY, _contentWidth, opts, MakeContext());
+                if (customY.HasValue)
+                {
+                    _currentY = customY.Value + opts.SpaceAfter;
+                    return;
+                }
+                _currentY -= opts.SpaceBefore;
+            }
+
             _currentY += opts.SpaceBefore;
 
             var richLines = FontMetrics.WrapRichText(element.Spans, _contentWidth);
@@ -437,6 +670,20 @@ namespace SimpleTinyPDF
             var opts = element.ImageOptions ?? new ImageOptions();
             var image = element.Image;
 
+            // Custom renderer override
+            if (_renderer != null)
+            {
+                _currentY += opts.SpaceBefore;
+                float? customY = _renderer.RenderImage(_currentPage, image,
+                    _contentLeft, _currentY, _contentWidth, opts, MakeContext());
+                if (customY.HasValue)
+                {
+                    _currentY = customY.Value + opts.SpaceAfter;
+                    return;
+                }
+                _currentY -= opts.SpaceBefore;
+            }
+
             _currentY += opts.SpaceBefore;
 
             // Calculate display dimensions
@@ -509,6 +756,18 @@ namespace SimpleTinyPDF
 
         private void RenderTable(LayoutElement element)
         {
+            // Custom renderer override
+            if (_renderer != null)
+            {
+                float? customY = _renderer.RenderTable(_currentPage, element.Table,
+                    _contentLeft, _currentY, MakeContext());
+                if (customY.HasValue)
+                {
+                    _currentY = customY.Value;
+                    return;
+                }
+            }
+
             int pagesBefore = _doc.PageCount;
             int pageNumBefore = _pageNumber;
 
@@ -522,6 +781,7 @@ namespace SimpleTinyPDF
                 for (int i = pagesBefore; i < pagesAfter; i++)
                 {
                     _pageNumber++;
+                    _sectionPageNumber++;
                     var page = _doc.Pages[i];
                     DrawHeaderOnPage(page, _pageNumber);
                     DrawFooterOnPage(page, _pageNumber);
@@ -550,12 +810,27 @@ namespace SimpleTinyPDF
                 for (int i = pagesBefore; i < pagesAfter; i++)
                 {
                     _pageNumber++;
+                    _sectionPageNumber++;
                     var page = _doc.Pages[i];
                     DrawHeaderOnPage(page, _pageNumber);
                     DrawFooterOnPage(page, _pageNumber);
                 }
 
                 _currentPage = resultPage;
+            }
+        }
+
+        // ── Result ─────────────────────────────────────────────────
+
+        internal class RenderResult
+        {
+            internal int TotalPages { get; }
+            internal int[] SectionPageCounts { get; }
+
+            internal RenderResult(int totalPages, int[] sectionPageCounts)
+            {
+                TotalPages = totalPages;
+                SectionPageCounts = sectionPageCounts;
             }
         }
     }

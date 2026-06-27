@@ -11,6 +11,7 @@ namespace SimpleTinyPDF
     public class PdfDocumentLayout
     {
         private readonly List<LayoutElement> _elements = new List<LayoutElement>();
+        private readonly List<object> _eventHandlers = new List<object>();
         private PdfDocument _document;
         private bool _generated;
 
@@ -37,6 +38,9 @@ namespace SimpleTinyPDF
 
         /// <summary>Default paragraph options applied when no explicit options are given.</summary>
         public ParagraphOptions DefaultParagraphOptions { get; set; }
+
+        /// <summary>Custom renderer for overriding default element rendering.</summary>
+        public CustomRenderer Renderer { get; set; }
 
         /// <summary>The underlying PdfDocument (available after Generate).</summary>
         public PdfDocument Document => _document;
@@ -79,6 +83,38 @@ namespace SimpleTinyPDF
             _elements.Add(LayoutElement.CreatePageBreak());
         }
 
+        /// <summary>
+        /// Starts a new section with independent page settings.
+        /// Null properties inherit from the parent layout.
+        /// </summary>
+        public void AddSection(SectionOptions options = null)
+        {
+            _elements.Add(LayoutElement.CreateSectionBreak(options ?? new SectionOptions()));
+        }
+
+        /// <summary>
+        /// Forces a column break. Advances to the next column, or to a
+        /// new page if already in the last column.
+        /// </summary>
+        public void AddColumnBreak()
+        {
+            _elements.Add(LayoutElement.CreateColumnBreak());
+        }
+
+        /// <summary>Adds a page event handler using a delegate.</summary>
+        public void AddEventHandler(Action<PageEventType, PdfPage, PageContext> handler)
+        {
+            if (handler != null)
+                _eventHandlers.Add(handler);
+        }
+
+        /// <summary>Adds a page event handler using the IPageEventHandler interface.</summary>
+        public void AddEventHandler(IPageEventHandler handler)
+        {
+            if (handler != null)
+                _eventHandlers.Add(handler);
+        }
+
         // ── Generate / Save ────────────────────────────────────────
 
         /// <summary>
@@ -97,18 +133,19 @@ namespace SimpleTinyPDF
                 // Pass 1: render to a temporary document to count pages
                 var tempDoc = new PdfDocument();
                 var engine1 = new FlowEngine(tempDoc, PageSize, Margins, HeaderFooter,
-                    DefaultParagraphOptions, totalPages: 0);
-                int totalPages = engine1.Render(_elements);
+                    DefaultParagraphOptions, totalPages: 0, _eventHandlers, Renderer);
+                var result1 = engine1.Render(_elements);
 
-                // Pass 2: render to the real document with correct total
+                // Pass 2: render to the real document with correct totals
                 var engine2 = new FlowEngine(_document, PageSize, Margins, HeaderFooter,
-                    DefaultParagraphOptions, totalPages: totalPages);
+                    DefaultParagraphOptions, totalPages: result1.TotalPages,
+                    _eventHandlers, Renderer, result1.SectionPageCounts);
                 engine2.Render(_elements);
             }
             else
             {
                 var engine = new FlowEngine(_document, PageSize, Margins, HeaderFooter,
-                    DefaultParagraphOptions, totalPages: 0);
+                    DefaultParagraphOptions, totalPages: 0, _eventHandlers, Renderer);
                 engine.Render(_elements);
             }
 

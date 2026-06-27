@@ -7,7 +7,9 @@ namespace SimpleTinyPDF
         Image,
         Table,
         List,
-        PageBreak
+        PageBreak,
+        SectionBreak,
+        ColumnBreak
     }
 
     internal class LayoutElement
@@ -21,6 +23,7 @@ namespace SimpleTinyPDF
         internal PdfTable Table { get; private set; }
         internal ListItem[] ListItems { get; private set; }
         internal ListStyle ListStyle { get; private set; }
+        internal SectionOptions SectionOptions { get; private set; }
 
         private LayoutElement() { }
 
@@ -41,5 +44,11 @@ namespace SimpleTinyPDF
 
         internal static LayoutElement CreatePageBreak() =>
             new LayoutElement { Type = LayoutElementType.PageBreak };
+
+        internal static LayoutElement CreateSectionBreak(SectionOptions options) =>
+            new LayoutElement { Type = LayoutElementType.SectionBreak, SectionOptions = options };
+
+        internal static LayoutElement CreateColumnBreak() =>
+            new LayoutElement { Type = LayoutElementType.ColumnBreak };
     }
 }

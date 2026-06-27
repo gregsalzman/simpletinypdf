@@ -7,7 +7,7 @@
 
     <!-- NuGet package metadata -->
     <PackageId>SimpleTinyPDF</PackageId>
-    <Version>0.70.0</Version>
+    <Version>0.71.0</Version>
     <Authors>Greg Salzman</Authors>
     <Description>A small-but-mighty, zero-dependency PDF generation library for .NET</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

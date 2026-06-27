@@ -17,10 +17,13 @@ namespace SimpleTinyPDF
         /// <summary>True if the page number is even.</summary>
         public bool IsEvenPage => PageNumber % 2 == 0;
 
-        /// <summary>Section page number (reserved for v0.71).</summary>
+        /// <summary>Page number within the current section (1-based).</summary>
         public int SectionPageNumber { get; internal set; }
 
-        /// <summary>Section total pages (reserved for v0.71).</summary>
+        /// <summary>Total pages in the current section (0 if unknown during first pass).</summary>
         public int SectionTotalPages { get; internal set; }
+
+        /// <summary>Zero-based section index.</summary>
+        public int SectionIndex { get; internal set; }
     }
 }

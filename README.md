@@ -37,7 +37,7 @@ A small-but-mighty zero-dependency PDF generation library for .NET.  It is faste
 - **Images** — JPEG and PNG (with transparency), EXIF auto-orientation, scaling modes (Stretch, Fit, Fill), opacity
 - **Tables** — styled headers, column alignment, alternate row shading, auto-pagination with repeated headers, CSV import
 - **Barcodes** — Code 128, Code 39, EAN-13, UPC-A, and QR Code; pure vector rendering (no images); configurable colors, quiet zones, human-readable text, rotation, and opacity
-- **Document Layout** — automatic content flow and pagination via `PdfDocumentLayout`. Add paragraphs, rich text, images, tables, and lists that flow across pages automatically. Headers and footers with page numbering (including accurate total page counts via two-pass rendering), first-page and even-page overrides, tab stops with leaders and decimal alignment, and manual page breaks
+- **Document Layout** — automatic content flow and pagination via `PdfDocumentLayout`. Add paragraphs, rich text, images, tables, and lists that flow across pages automatically. Headers and footers with page numbering (including accurate total page counts via two-pass rendering), first-page and even-page overrides, tab stops with leaders and decimal alignment, manual page breaks, document sections with independent page size/margins/headers per section, multi-column text flow, page lifecycle events, and custom renderers for pluggable layout behavior
 - **Lists** — bullet, numbered, lowercase Roman (i, ii, iii…), and uppercase Roman (I, II, III…); unlimited nesting with per-level style overrides and custom bullet symbols; automatic text wrapping and multi-page flow
 - **Shapes** — lines, rectangles (stroke and/or fill), with optional rotation
 - **Bookmarks** — hierarchical outline / table of contents
@@ -94,7 +94,7 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~192 KB** | **~192 KB** | **1x** | No |
+| **SimpleTinyPDF** | **~188 KB** | **~188 KB** | **1x** | No |
 | **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 32x | No |
 | **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 73x | No (BouncyCastle ~8 MB) |
 | **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 188x | Yes (bundled Skia) |
@@ -126,7 +126,7 @@ Benchmarked with [BenchmarkDotNet](https://benchmarkdotnet.org/) on Windows 11, 
 | **QuestPDF** 2026.5 | 975 ms | 224 MB | 9x slower |
 | **IronPDF** 2026.5 | N/A | N/A | — |
 
-**Scenario 3 — Multi-page flowing report** (50 paragraphs with chapter headings, headers/footers with page numbers, summary table):
+**Scenario 3 — Multi-page flowing report** (50 paragraphs with chapter headings, headers/footers with page numbers, summary table; uses `PdfDocumentLayout` with sections, columns, and page events):
 
 | Library | Mean | Allocated | vs SimpleTinyPDF |
 |---|---|---|---|
@@ -1174,6 +1174,10 @@ layout.Save("output.pdf");
 | `AddTable(table)` | Add a table at the current flow position |
 | `AddList(items, style?)` | Add a list at the current flow position |
 | `AddPageBreak()` | Force a page break |
+| `AddSection(options?)` | Start a new section with independent page settings |
+| `AddColumnBreak()` | Force a column break (next column, or next page if last column) |
+| `AddEventHandler(action)` | Add a page event handler (delegate or `IPageEventHandler`) |
+| `Renderer` | Custom renderer for overriding default element rendering |
 | `Generate()` | Render all elements and return the `PdfDocument` |
 | `Save(string)` / `Save(Stream)` | Generate and save to file or stream |
 | `ToArray()` | Generate and return PDF as byte array |
@@ -1207,6 +1211,9 @@ Each callback receives the `PdfPage` and a `PageContext` with:
 | `TotalPages` | Total number of pages (accurate via two-pass rendering) |
 | `IsFirstPage` | True if this is the first page |
 | `IsEvenPage` | True if the page number is even |
+| `SectionIndex` | Zero-based section index |
+| `SectionPageNumber` | Page number within the current section (1-based) |
+| `SectionTotalPages` | Total pages in the current section (accurate via two-pass) |
 
 **ParagraphOptions:**
 
@@ -1260,6 +1267,129 @@ layout.AddParagraph("Item\t$100.00\tPaid", new ParagraphOptions
 | `Center` | Text is centered at the tab position |
 | `Right` | Text ends at the tab position |
 | `Decimal` | The decimal point aligns at the tab position |
+
+**Sections:**
+
+Sections let you change page size, margins, and headers/footers mid-document. Each section starts on a new page with its own settings. Null properties inherit from the parent layout.
+
+```csharp
+var layout = new PdfDocumentLayout();
+layout.AddParagraph("Section 1 — A4 portrait");
+
+// Switch to landscape Letter with narrow margins
+layout.AddSection(new SectionOptions
+{
+    PageSize = PageSize.Letter.Landscape(),
+    Margins = new PdfMargins(36),
+    RestartPageNumbers = true,  // page numbers restart at 1
+    HeaderFooter = new HeaderFooterOptions
+    {
+        Header = (page, ctx) =>
+            page.DrawText($"Appendix — Page {ctx.SectionPageNumber}",
+                72, 20, PdfFont.Helvetica, 9, PdfColor.DarkGray)
+    }
+});
+layout.AddParagraph("Section 2 — Letter landscape with custom header");
+```
+
+**SectionOptions:**
+
+| Property | Default | Description |
+|---|---|---|
+| `PageSize` | null (inherit) | Page size for this section |
+| `Margins` | null (inherit) | Page margins for this section |
+| `HeaderFooter` | null (inherit) | Header/footer configuration for this section |
+| `RestartPageNumbers` | false | Reset page number to 1 at the start of this section |
+| `ColumnCount` | 1 | Number of text columns (1 = single column) |
+| `ColumnGap` | 18 | Gap between columns in points |
+
+**Multi-column layout:**
+
+Sections can have multiple columns. Content flows down each column, then to the next column, then to a new page.
+
+```csharp
+// Newsletter-style 2-column layout
+layout.AddSection(new SectionOptions { ColumnCount = 2, ColumnGap = 18 });
+layout.AddParagraph("This text flows across two columns automatically...");
+
+// Force next column (or next page if on the last column)
+layout.AddColumnBreak();
+layout.AddParagraph("This starts in the second column.");
+
+// 3-column layout with a narrow gap
+layout.AddSection(new SectionOptions { ColumnCount = 3, ColumnGap = 12 });
+layout.AddParagraph("Three-column newspaper-style text...");
+```
+
+**Page events:**
+
+Page events let you hook into the page lifecycle — for example, to add a watermark on every page or draw page borders.
+
+```csharp
+// Delegate-based event handler
+layout.AddEventHandler((eventType, page, ctx) =>
+{
+    if (eventType == PageEventType.PageCreated)
+    {
+        // Draw a watermark on every page
+        page.DrawText("DRAFT", page.Width / 2 - 50, page.Height / 2,
+            PdfFont.HelveticaBold, 48, PdfColor.Rgb(230, 230, 230));
+    }
+});
+
+// Interface-based event handler
+layout.AddEventHandler(new MyPageEventHandler());
+```
+
+| `PageEventType` | Description |
+|---|---|
+| `PageCreated` | A new page has been created and its header drawn |
+| `PageFinished` | A page is about to have its footer drawn and be finalized |
+| `SectionStarted` | A new section has started |
+| `SectionFinished` | A section has finished |
+
+```csharp
+// IPageEventHandler interface
+public class BorderHandler : IPageEventHandler
+{
+    public void HandleEvent(PageEventType eventType, PdfPage page, PageContext context)
+    {
+        if (eventType == PageEventType.PageCreated)
+            page.DrawRectangle(36, 36, page.Width - 72, page.Height - 72,
+                PdfColor.LightGray, stroke: true, fill: false);
+    }
+}
+```
+
+**Custom renderer:**
+
+Override default element rendering by subclassing `CustomRenderer`. Return a new Y position to replace default rendering, or return `null` to use the default.
+
+```csharp
+layout.Renderer = new HighlightRenderer();
+
+public class HighlightRenderer : CustomRenderer
+{
+    public override float? RenderParagraph(PdfPage page, string text, float x, float y,
+        float width, ParagraphOptions options, PageContext context)
+    {
+        // Draw a yellow background behind every paragraph
+        float height = 20;
+        page.DrawRectangle(x, y, width, height, PdfColor.Rgb(255, 255, 200));
+        page.DrawText(text, x + 4, y + 2, options.Font ?? PdfFont.Helvetica,
+            options.FontSize, options.Color ?? PdfColor.Black);
+        return y + height;  // return new Y position
+    }
+}
+```
+
+| Method | Description |
+|---|---|
+| `RenderParagraph(...)` | Override plain-text paragraph rendering |
+| `RenderRichParagraph(...)` | Override rich-text paragraph rendering |
+| `RenderImage(...)` | Override image rendering |
+| `RenderTable(...)` | Override table rendering |
+| `ShouldBreakPage(remainingHeight, elementHeight, context)` | Override page break decision (return `true` to force, `false` to prevent, `null` for default) |
 
 ## Example: Invoice with Company Logo
 
@@ -1394,6 +1524,7 @@ doc.Save("sales-report.pdf");
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.71 | June 27, 2026 | Add document sections with independent page size, margins, and headers/footers per section (`AddSection`), multi-column text flow (`ColumnCount`, `ColumnGap`, `AddColumnBreak`), page lifecycle events (`IPageEventHandler` / `PageEventType`), and custom renderers (`CustomRenderer` base class) to the layout engine. Section page numbering with optional restart. |
 | 0.70 | June 23, 2026 | Add high-level document layout engine (`PdfDocumentLayout`) with automatic content flow, pagination, headers/footers with page numbering, tab stops, and two-pass rendering for accurate total page counts. Supports paragraphs, rich text, images, tables, lists, and manual page breaks in a flowing layout. |
 | 0.61 | June 13, 2026 | Add `PdfUnit` static class for converting between PDF points and inches, centimeters, and millimeters. Includes fractional inch support via string parsing ("1-1/8", "1 1/8", "3/4") and explicit whole/numerator/denominator parameters. |
 | 0.60 | June 8, 2026 | Add interactive form fields (AcroForms): text fields (single/multi-line, password), checkboxes, radio buttons, dropdowns, listboxes (single/multi-select), and push buttons. Fields are editable in Adobe Acrobat and other PDF viewers. Add PKCS#7 digital signatures with X.509 certificates. Visible and invisible signatures, SHA-256/384/512, optional RFC 3161 timestamping (DigiCert, Sectigo, FreeTSA, or custom URL), intermediate CA certificate chains, and custom signer delegate for HSM/smart card/cloud KMS.|
