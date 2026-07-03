@@ -12,6 +12,8 @@ namespace SimpleTinyPDF
         private readonly float _totalWidth;
 
         internal int CurrentColumn { get; private set; }
+        internal int ColumnCount => _columnCount;
+        internal float ColumnGap => _columnGap;
         internal float ColumnWidth { get; }
         internal float ColumnX => _contentLeft + CurrentColumn * (ColumnWidth + _columnGap);
 

@@ -94,7 +94,7 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~188 KB** | **~188 KB** | **1x** | No |
+| **SimpleTinyPDF** | **~192 KB** | **~192 KB** | **1x** | No |
 | **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 32x | No |
 | **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 73x | No (BouncyCastle ~8 MB) |
 | **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 188x | Yes (bundled Skia) |
@@ -1232,6 +1232,11 @@ Each callback receives the `PdfPage` and a `PageContext` with:
 | `CharacterSpacing` | 0 | Extra space between characters in points |
 | `Opacity` | 1.0 | Text opacity (0.0–1.0) |
 | `TabStops` | null | Tab stop definitions for tab-delimited text |
+| `LeftIndent` | 0 | Left indentation in points |
+| `RightIndent` | 0 | Right indentation in points |
+| `FirstLineIndent` | 0 | Extra first-line indent in points (negative = hanging indent) |
+| `KeepTogether` | false | Move the paragraph to the next page instead of splitting it |
+| `KeepWithNext` | false | Keep the paragraph on the same page as the start of the next element |
 
 **ImageOptions:**
 
@@ -1391,6 +1396,92 @@ public class HighlightRenderer : CustomRenderer
 | `RenderTable(...)` | Override table rendering |
 | `ShouldBreakPage(remainingHeight, elementHeight, context)` | Override page break decision (return `true` to force, `false` to prevent, `null` for default) |
 
+**Indentation:**
+
+```csharp
+// Block indentation
+layout.AddParagraph("Indented block quote...", new ParagraphOptions
+{
+    LeftIndent = 36,
+    RightIndent = 36
+});
+
+// First-line indent (classic book typography)
+layout.AddParagraph("The first line is indented...", new ParagraphOptions
+{
+    FirstLineIndent = 18
+});
+
+// Hanging indent (bibliography style)
+layout.AddParagraph("Salzman, G. (2026). SimpleTinyPDF...", new ParagraphOptions
+{
+    LeftIndent = 36,
+    FirstLineIndent = -36  // first line back at the margin
+});
+```
+
+**Keep-together and keep-with-next:**
+
+```csharp
+// A heading never gets orphaned at the bottom of a page
+layout.AddParagraph("Chapter 3", new ParagraphOptions
+{
+    Font = PdfFont.HelveticaBold, FontSize = 16,
+    KeepWithNext = true  // stays with the paragraph below
+});
+layout.AddParagraph("Chapter body text...");
+
+// A block quote never splits across pages (best effort — blocks
+// taller than one page still split)
+layout.AddParagraph("Long block quote...", new ParagraphOptions
+{
+    KeepTogether = true
+});
+```
+
+**Horizontal rules:**
+
+```csharp
+layout.AddHorizontalRule();  // thin full-width divider
+
+layout.AddHorizontalRule(new HorizontalRuleOptions
+{
+    Thickness = 2f,
+    Color = PdfColor.DarkGray,
+    SpaceBefore = 12, SpaceAfter = 12,
+    LeftIndent = 100, RightIndent = 100
+});
+```
+
+| `HorizontalRuleOptions` | Default | Description |
+|---|---|---|
+| `Thickness` | 0.5 | Line thickness in points |
+| `Color` | Black | Rule color |
+| `SpaceBefore` / `SpaceAfter` | 6 | Vertical spacing in points |
+| `LeftIndent` / `RightIndent` | 0 | Horizontal insets from the content edges |
+
+**Lazy rendering:**
+
+For very large documents, skip the page-counting pass and render in a single streaming pass. Trade-off: `PageContext.TotalPages` and `SectionTotalPages` stay 0, so "Page X of Y" footers are unavailable.
+
+```csharp
+var layout = new PdfDocumentLayout { LazyRendering = true };
+```
+
+**Debug helpers:**
+
+```csharp
+layout.Debug = new DebugOptions
+{
+    ShowMargins = true,        // dashed lines at margin boundaries
+    ShowColumns = true,        // dashed lines between columns
+    ShowElementBounds = true,  // rectangle around each element
+    OnLayoutWarning = msg => Console.WriteLine(msg)
+};
+```
+
+`OnLayoutWarning` reports layout problems: oversized images scaled to fit, empty paragraphs, indents wider than the content area, and keep-together blocks too tall to fit on one page.
+
 ## Example: Invoice with Company Logo
 
 ![Invoice example output](docs/example-invoice.png)
@@ -1524,6 +1615,7 @@ doc.Save("sales-report.pdf");
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.72 | July 3, 2026 | Add advanced layout controls: paragraph indentation (`LeftIndent`, `RightIndent`, `FirstLineIndent` with hanging indent support), `KeepTogether` / `KeepWithNext` pagination control, horizontal rules (`AddHorizontalRule`), single-pass lazy rendering for large documents (`LazyRendering`), and debug helpers (`DebugOptions`: margin/column guides, element bounds, layout warnings). |
 | 0.71 | June 27, 2026 | Add document sections with independent page size, margins, and headers/footers per section (`AddSection`), multi-column text flow (`ColumnCount`, `ColumnGap`, `AddColumnBreak`), page lifecycle events (`IPageEventHandler` / `PageEventType`), and custom renderers (`CustomRenderer` base class) to the layout engine. Section page numbering with optional restart. |
 | 0.70 | June 23, 2026 | Add high-level document layout engine (`PdfDocumentLayout`) with automatic content flow, pagination, headers/footers with page numbering, tab stops, and two-pass rendering for accurate total page counts. Supports paragraphs, rich text, images, tables, lists, and manual page breaks in a flowing layout. |
 | 0.61 | June 13, 2026 | Add `PdfUnit` static class for converting between PDF points and inches, centimeters, and millimeters. Includes fractional inch support via string parsing ("1-1/8", "1 1/8", "3/4") and explicit whole/numerator/denominator parameters. |

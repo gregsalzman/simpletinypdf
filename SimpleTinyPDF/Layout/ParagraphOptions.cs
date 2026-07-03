@@ -43,5 +43,30 @@ namespace SimpleTinyPDF
 
         /// <summary>Tab stop definitions for tab-delimited text.</summary>
         public TabStop[] TabStops { get; set; }
+
+        /// <summary>Left indentation in points. Shifts the paragraph's content area right.</summary>
+        public float LeftIndent { get; set; }
+
+        /// <summary>Right indentation in points. Shrinks the paragraph's content area from the right.</summary>
+        public float RightIndent { get; set; }
+
+        /// <summary>
+        /// Additional first-line indent in points, applied on top of LeftIndent.
+        /// Negative values create a hanging indent. Applies to plain-text paragraphs.
+        /// </summary>
+        public float FirstLineIndent { get; set; }
+
+        /// <summary>
+        /// Prevents the paragraph from splitting across pages or columns.
+        /// Best effort: a paragraph taller than one page is still split.
+        /// </summary>
+        public bool KeepTogether { get; set; }
+
+        /// <summary>
+        /// Keeps this paragraph on the same page as the start of the next element.
+        /// Forces a page break before this paragraph if the next element's first
+        /// line would not fit below it.
+        /// </summary>
+        public bool KeepWithNext { get; set; }
     }
 }

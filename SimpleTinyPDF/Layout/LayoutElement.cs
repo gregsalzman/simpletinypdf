@@ -9,7 +9,8 @@ namespace SimpleTinyPDF
         List,
         PageBreak,
         SectionBreak,
-        ColumnBreak
+        ColumnBreak,
+        HorizontalRule
     }
 
     internal class LayoutElement
@@ -24,6 +25,7 @@ namespace SimpleTinyPDF
         internal ListItem[] ListItems { get; private set; }
         internal ListStyle ListStyle { get; private set; }
         internal SectionOptions SectionOptions { get; private set; }
+        internal HorizontalRuleOptions RuleOptions { get; private set; }
 
         private LayoutElement() { }
 
@@ -50,5 +52,8 @@ namespace SimpleTinyPDF
 
         internal static LayoutElement CreateColumnBreak() =>
             new LayoutElement { Type = LayoutElementType.ColumnBreak };
+
+        internal static LayoutElement CreateHorizontalRule(HorizontalRuleOptions options) =>
+            new LayoutElement { Type = LayoutElementType.HorizontalRule, RuleOptions = options };
     }
 }

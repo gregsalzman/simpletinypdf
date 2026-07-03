@@ -42,6 +42,19 @@ namespace SimpleTinyPDF
         /// <summary>Custom renderer for overriding default element rendering.</summary>
         public CustomRenderer Renderer { get; set; }
 
+        /// <summary>
+        /// When true, renders in a single streaming pass and skips the
+        /// page-counting pass. Faster for very large documents, but
+        /// PageContext.TotalPages and SectionTotalPages remain 0.
+        /// </summary>
+        public bool LazyRendering { get; set; }
+
+        /// <summary>
+        /// Debug helpers: margin/column guides, element bounding boxes,
+        /// and layout warnings.
+        /// </summary>
+        public DebugOptions Debug { get; set; }
+
         /// <summary>The underlying PdfDocument (available after Generate).</summary>
         public PdfDocument Document => _document;
 
@@ -75,6 +88,12 @@ namespace SimpleTinyPDF
         public void AddList(ListItem[] items, ListStyle style = ListStyle.Bullet)
         {
             _elements.Add(LayoutElement.CreateList(items, style));
+        }
+
+        /// <summary>Adds a horizontal rule spanning the content width.</summary>
+        public void AddHorizontalRule(HorizontalRuleOptions options = null)
+        {
+            _elements.Add(LayoutElement.CreateHorizontalRule(options));
         }
 
         /// <summary>Forces a page break.</summary>
@@ -128,9 +147,17 @@ namespace SimpleTinyPDF
 
             if (_elements.Count == 0) return _document;
 
-            if (HeaderFooter != null && HeaderFooter.HasAny)
+            if (LazyRendering)
+            {
+                // Single streaming pass; TotalPages stays 0
+                var lazy = new LazyFlowEngine(_document, PageSize, Margins, HeaderFooter,
+                    DefaultParagraphOptions, _eventHandlers, Renderer, Debug);
+                lazy.Render(_elements);
+            }
+            else if (HeaderFooter != null && HeaderFooter.HasAny)
             {
                 // Pass 1: render to a temporary document to count pages
+                // (no debug — overlays and warnings belong to the final pass)
                 var tempDoc = new PdfDocument();
                 var engine1 = new FlowEngine(tempDoc, PageSize, Margins, HeaderFooter,
                     DefaultParagraphOptions, totalPages: 0, _eventHandlers, Renderer);
@@ -139,13 +166,14 @@ namespace SimpleTinyPDF
                 // Pass 2: render to the real document with correct totals
                 var engine2 = new FlowEngine(_document, PageSize, Margins, HeaderFooter,
                     DefaultParagraphOptions, totalPages: result1.TotalPages,
-                    _eventHandlers, Renderer, result1.SectionPageCounts);
+                    _eventHandlers, Renderer, result1.SectionPageCounts, Debug);
                 engine2.Render(_elements);
             }
             else
             {
                 var engine = new FlowEngine(_document, PageSize, Margins, HeaderFooter,
-                    DefaultParagraphOptions, totalPages: 0, _eventHandlers, Renderer);
+                    DefaultParagraphOptions, totalPages: 0, _eventHandlers, Renderer,
+                    sectionTotalPages: null, debug: Debug);
                 engine.Render(_elements);
             }
 
