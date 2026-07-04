@@ -15,7 +15,7 @@ A small-but-mighty zero-dependency PDF generation library for .NET.  It is faste
 - [Performance Comparison](#performance-comparison)
 - [API Reference](#api-reference)
   - [PdfDocument](#pdfdocument)
-  - [PdfPage](#pdfpage) — [Text](#text) · [Shapes](#shapes) · [Images](#images) · [Tables](#tables) · [Lists](#lists)
+  - [PdfPage](#pdfpage) — [Text](#text) · [Right-to-Left Text](#right-to-left-text-arabic-hebrew) · [Shapes](#shapes) · [Images](#images) · [Tables](#tables) · [Lists](#lists)
   - [Document Layout](#document-layout)
   - [PdfColor](#pdfcolor)
   - [PageSize](#pagesize)
@@ -34,6 +34,7 @@ A small-but-mighty zero-dependency PDF generation library for .NET.  It is faste
 ## Features
 
 - **Text** — single-line, wrapped text boxes, rich text with mixed fonts/sizes/colors, alignment (left, center, right, justify), underline, hyperlinks, opacity, character spacing, faux bold, faux italic
+- **Right-to-left text** — Arabic and Hebrew render correctly with no extra code: built-in Unicode Bidirectional Algorithm (UAX #9) for mixed RTL/LTR lines, Arabic contextual letter joining and lam-alef ligatures via presentation forms, mirrored brackets, and wrapped/justified RTL paragraphs — all in pure C# with zero dependencies
 - **Images** — JPEG and PNG (with transparency), EXIF auto-orientation, scaling modes (Stretch, Fit, Fill), opacity
 - **Tables** — styled headers, column alignment, alternate row shading, auto-pagination with repeated headers, CSV import
 - **Barcodes** — Code 128, Code 39, EAN-13, UPC-A, and QR Code; pure vector rendering (no images); configurable colors, quiet zones, human-readable text, rotation, and opacity
@@ -85,7 +86,7 @@ See the full [Invoice example](#example-invoice-with-company-logo) and [CSV Tabl
 **Look elsewhere if you need:**
 
 - HTML-to-PDF conversion
-- Right-to-left text layout (Arabic, Hebrew) or complex script shaping
+- Full OpenType shaping — font-specific ligatures, precise diacritic positioning, or Nastaliq-style Urdu (standard Arabic and Hebrew are supported; see [Right-to-Left Text](#right-to-left-text-arabic-hebrew))
 - PDF reading, parsing, or editing
 
 ## Size Comparison
@@ -94,11 +95,13 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~192 KB** | **~192 KB** | **1x** | No |
-| **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 32x | No |
-| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 73x | No (BouncyCastle ~8 MB) |
-| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 188x | Yes (bundled Skia) |
-| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 1,302x | Yes (bundled Chromium) |
+| **SimpleTinyPDF** | **~227 KB** | **~227 KB** | **1x** | No |
+| **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 28x | No |
+| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 63x | No (BouncyCastle ~8 MB) |
+| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 162x | Yes (bundled Skia) |
+| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 1,128x | Yes (bundled Chromium) |
+
+The v0.80 right-to-left text support (full UAX #9 bidirectional algorithm, Arabic shaper, and Unicode data tables) added about 35 KB — the entire feature is smaller than a typical favicon. For comparison, adding RTL via HarfBuzzSharp would add roughly 8 MB of native binaries across platforms.
 
 PDFsharp is shown with MigraDoc (its document-model layer) since most real-world usage relies on MigraDoc for tables, paragraphs, and auto-pagination — raw PDFsharp alone is ~4.4 MB. IronPDF's footprint includes the Chromium rendering engine downloaded at build/runtime. QuestPDF bundles custom Skia native binaries for cross-platform rendering.
 
@@ -136,6 +139,8 @@ Benchmarked with [BenchmarkDotNet](https://benchmarkdotnet.org/) on Windows 11, 
 | **IronPDF** 2026.5 | N/A | N/A | — |
 
 SimpleTinyPDF is the fastest library in all three scenarios. In the layout report benchmark (Scenario 3), SimpleTinyPDF's new `PdfDocumentLayout` engine is 13x faster than MigraDoc and 17x faster than QuestPDF while using a fraction of the memory compared to MigraDoc. QuestPDF achieves lower memory allocation but is significantly slower. In the data-heavy scenarios (1 and 2), SimpleTinyPDF leads by 7–43x in speed with substantially lower memory allocation.
+
+**v0.80 note:** the SimpleTinyPDF scenarios were re-benchmarked after adding right-to-left text support and are unchanged within run-to-run noise (Scenario 1: ~170 ms, Scenario 2: ~80 ms, Scenario 3: ~1.1 ms; allocations identical). Text that contains no RTL characters pays only a single fast range-check scan per drawn string — the bidirectional algorithm and Arabic shaper run only when a string actually contains Arabic, Hebrew, or bidi control characters.
 
 ## API Reference
 
@@ -325,7 +330,8 @@ Built-in `PdfFont` values are automatically converted to `PdfFontSource`, so all
 - Full Unicode Basic Multilingual Plane (BMP) — U+0000 to U+FFFF
 - Supplementary Unicode planes — U+10000 to U+10FFFF (CJK Extension B, enclosed alphanumerics, etc.)
 - CJK characters (Chinese, Japanese, Korean)
-- Cyrillic, Greek, Arabic characters, and other scripts
+- Cyrillic, Greek, and other scripts
+- Arabic and Hebrew with automatic right-to-left layout and Arabic letter joining (see [Right-to-Left Text](#right-to-left-text-arabic-hebrew))
 - Any character the font contains a glyph for
 
 **Font Subsetting**
@@ -341,10 +347,46 @@ font.Subset = false; // embed the full font binary
 
 OpenType (`.otf`) fonts with CFF outlines are currently embedded in full.
 
+#### Right-to-Left Text (Arabic, Hebrew)
+
+Arabic and Hebrew work automatically — pass text in normal logical order (the order you type it) and SimpleTinyPDF handles the rest. The Unicode Bidirectional Algorithm (UAX #9) reorders each line to visual order, Arabic letters are joined via contextual presentation forms (isolated/initial/medial/final plus the mandatory lam-alef ligatures), brackets are mirrored inside RTL runs, and Arabic diacritics (tashkeel) stay attached to their letters.
+
+```csharp
+// Any font with the right coverage works. DejaVu Sans covers both scripts;
+// Amiri and Noto Naskh Arabic cover Arabic only.
+var rtlFont = PdfFontSource.FromFile("DejaVuSans.ttf");
+
+// Tip: keep RTL literals in variables — mixing them inline with more
+// arguments is valid C#, but bidi-aware editors display the line scrambled.
+string arabicGreeting = "السلام عليكم";
+string hebrewGreeting = "שלום עולם";
+string mixedLine = "Invoice 42 فاتورة (2026)";
+string arabicParagraph = "السلام عليكم ورحمة الله وبركاته السلام عليكم ورحمة الله وبركاته";
+
+// Right-align RTL text so it reads naturally from the right margin
+page.DrawText(arabicGreeting, 545, 50, rtlFont, 18, alignment: TextAlignment.Right);
+page.DrawText(hebrewGreeting, 545, 80, rtlFont, 18, alignment: TextAlignment.Right);
+
+// Mixed directions just work — Latin and digits stay left-to-right
+page.DrawText(mixedLine, 50, 110, rtlFont, 12);
+
+// Wrapped and justified RTL paragraphs
+page.DrawText(arabicParagraph, 50, 140, rtlFont, 12,
+    width: 300, alignment: TextAlignment.Right);
+```
+
+Requirements and notes:
+
+- A custom font whose cmap includes the Arabic Presentation Forms blocks is required for Arabic (most Arabic fonts qualify: Amiri, Noto Naskh Arabic, Arial, Tahoma, Times New Roman, DejaVu Sans, Traditional Arabic, ...). Hebrew needs no special glyphs — any font with Hebrew coverage works.
+- The 14 built-in PDF fonts contain no Arabic or Hebrew glyphs; a custom font is required.
+- Shaping is presentation-form based, not an OpenType GSUB engine: font-specific optional ligatures and precise GPOS diacritic positioning are not applied. Naskh-style fonts render well; calligraphic Nastaliq styles (common for Urdu) will not look right.
+- Shadda+vowel mark combinations are substituted with the precomposed stacked forms (U+FC60–U+FC62) when the font provides those glyphs (Tahoma, Arial, Times New Roman, and most Arabic fonts do), so the vowel renders correctly above the shadda. In fonts without them (e.g. DejaVu Sans) the two marks overlap.
+- Text extraction (copy/paste) from the PDF yields visual-order presentation forms rather than the original logical-order text.
+- In rich text (`TextSpan`), each span/word is processed independently, so a multi-word RTL run inside *wrapped* rich text keeps logical word order. Plain `DrawText` (with or without `width`) handles multi-word RTL correctly.
+
 **What Is Not Supported**
 
-- Right-to-left text layout (Arabic and Hebrew characters render, but layout is left-to-right)
-- Complex script shaping (ligatures, combining marks)
+- OpenType GSUB/GPOS shaping (font-specific ligatures, precise diacritic positioning, Nastaliq-style Urdu) — Arabic shaping uses Unicode presentation forms instead
 - CFF/OpenType font subsetting (the full font file is embedded; TrueType fonts are subsetted)
 - WOFF/WOFF2 web font formats
 
@@ -1615,6 +1657,7 @@ doc.Save("sales-report.pdf");
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.80 | July 12, 2026 | Add right-to-left text support for Arabic and Hebrew. Pure C# Unicode Bidirectional Algorithm (UAX #9, adapted from RichTextKit) resolves mixed RTL/LTR lines with correct digit ordering, bracket pairing, and mirroring; Arabic contextual shaping via Unicode presentation forms handles letter joining, lam-alef ligatures, tashkeel marks, and Persian/Urdu extended letters. Works automatically with logical-order input in single-line, wrapped, and justified text — no API changes, no new dependencies (~35 KB). |
 | 0.72 | July 3, 2026 | Add advanced layout controls: paragraph indentation (`LeftIndent`, `RightIndent`, `FirstLineIndent` with hanging indent support), `KeepTogether` / `KeepWithNext` pagination control, horizontal rules (`AddHorizontalRule`), single-pass lazy rendering for large documents (`LazyRendering`), and debug helpers (`DebugOptions`: margin/column guides, element bounds, layout warnings). |
 | 0.71 | June 27, 2026 | Add document sections with independent page size, margins, and headers/footers per section (`AddSection`), multi-column text flow (`ColumnCount`, `ColumnGap`, `AddColumnBreak`), page lifecycle events (`IPageEventHandler` / `PageEventType`), and custom renderers (`CustomRenderer` base class) to the layout engine. Section page numbering with optional restart. |
 | 0.70 | June 23, 2026 | Add high-level document layout engine (`PdfDocumentLayout`) with automatic content flow, pagination, headers/footers with page numbering, tab stops, and two-pass rendering for accurate total page counts. Supports paragraphs, rich text, images, tables, lists, and manual page breaks in a flowing layout. |
@@ -1635,6 +1678,17 @@ doc.Save("sales-report.pdf");
 This library was written as an exploration of what my increasingly good friend Claude could accomplish.  I continue to be amazed at what generative AI can do.
 
 Sample image assets in the tests project are taken from https://www.publicdomainpictures.net/
+
+### Third-Party Code
+
+SimpleTinyPDF remains zero-dependency, but the right-to-left text support (v0.80) gratefully incorporates adapted open-source code and data. Each adapted source file carries its original license header plus a provenance note:
+
+- **[RichTextKit](https://github.com/toptensoftware/RichTextKit)** by Topten Software (Apache License 2.0) — the Unicode Bidirectional Algorithm (UAX #9) implementation in `SimpleTinyPDF/Text/Bidi/` (`Bidi.cs`, `BidiData.cs`, supporting utility classes, and the `BidiClasses.trie` character-class data resource) was adapted from RichTextKit's `BidiAlgorithm`. RichTextKit's trie reader is itself a port of [unicode-trie](https://github.com/foliojs/unicode-trie) (foliojs), which derives from ICU's UTrie2.
+- **[Arabic Support for Unity](https://github.com/Konash/arabic-support-unity)** by Abdullah Konash (MIT License) — served as the reference for the presentation-forms approach to Arabic contextual shaping used in `SimpleTinyPDF/Text/ArabicShaper.cs`.
+- **[Unicode Character Database](https://www.unicode.org/ucd/)** © Unicode, Inc. ([Unicode License](https://www.unicode.org/license.txt)) — the Arabic contextual-form tables, lam-alef ligature tables, and bracket-mirroring tables were generated from `UnicodeData.txt` and `BidiMirroring.txt`.
+- **[DejaVu Sans](https://dejavu-fonts.github.io/)** (DejaVu Fonts License, based on Bitstream Vera) — used as a test asset in the test project only; not distributed with the library.
+
+Thank you to these projects — full shaping engines like [HarfBuzz](https://github.com/harfbuzz/harfbuzz) remain the gold standard, and the presentation-forms approach here is a deliberately tiny alternative that covers standard Arabic and Hebrew without native binaries.
 
 ## License
 

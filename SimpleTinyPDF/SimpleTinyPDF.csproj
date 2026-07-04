@@ -7,7 +7,7 @@
 
     <!-- NuGet package metadata -->
     <PackageId>SimpleTinyPDF</PackageId>
-    <Version>0.72.0</Version>
+    <Version>0.80.0</Version>
     <Authors>Greg Salzman</Authors>
     <Description>A small-but-mighty, zero-dependency PDF generation library for .NET</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -27,5 +27,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Text\Resources\BidiClasses.trie" LogicalName="SimpleTinyPDF.Text.Resources.BidiClasses.trie" />
   </ItemGroup>
 </Project>

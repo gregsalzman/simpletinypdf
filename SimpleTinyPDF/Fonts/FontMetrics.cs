@@ -23,6 +23,11 @@ namespace SimpleTinyPDF
             if (font.IsBuiltIn)
                 return MeasureString(text, font.BuiltInFont, fontSize, charSpacing);
             if (string.IsNullOrEmpty(text)) return 0;
+            // RTL text is measured in its shaped (presentation-form) version so
+            // widths match what DrawText emits. Reordering is a permutation, so
+            // measuring processed text is safe even if the caller already processed it.
+            if (Text.TextShaper.NeedsProcessing(text))
+                text = Text.TextShaper.Process(text, font);
             int total = 0;
             int glyphCount = 0;
             for (int i = 0; i < text.Length; i++)

@@ -331,6 +331,8 @@ namespace SimpleTinyPDF
             string link, float rotation,
             float characterSpacing = 0f, bool bold = false, bool italic = false)
         {
+            // Convert RTL text (Arabic, Hebrew) to shaped, visual-order form
+            text = Text.TextShaper.Process(text, font);
             var c = color ?? PdfColor.Black;
             var fontId = EnsureFont(font);
             float pdfY = CoordinateOrigin == CoordinateOrigin.TopDown
@@ -465,7 +467,7 @@ namespace SimpleTinyPDF
                     AppendTextMatrix(cursorX, pdfY, span.Italic);
 
                 float spanWidth = MeasureText(span.Text, span.Font, span.FontSize, span.CharacterSpacing);
-                _content.AppendFormat("{0} Tj\n", EncodeText(span.Text, span.Font));
+                _content.AppendFormat("{0} Tj\n", EncodeText(Text.TextShaper.Process(span.Text, span.Font), span.Font));
                 if (span.Underline)
                     ulSpans?.Add((cursorX, spanWidth, span.FontSize, span.Color));
                 if (!string.IsNullOrEmpty(span.Link))
@@ -528,7 +530,11 @@ namespace SimpleTinyPDF
 
             for (int li = 0; li < lines.Count; li++)
             {
-                var line = lines[li];
+                // Wrapping ran on logical-order text; each final line is converted
+                // to shaped, visual-order form here (UAX #9 applies per line).
+                // The justify path below then splits visual-order words, so
+                // justified RTL lines come out correct.
+                var line = Text.TextShaper.Process(lines[li], font);
                 float pdfY = topDown ? Height - currentY - fontSize : currentY;
                 float drawX = x;
                 float lineW = MeasureText(line, font, fontSize, characterSpacing);
@@ -787,7 +793,7 @@ namespace SimpleTinyPDF
                     if (usePerWordTm)
                         AppendTextMatrix(cursorX, pdfY, word.Italic);
 
-                    _content.AppendFormat("{0} Tj\n", EncodeText(word.Text, word.Font));
+                    _content.AppendFormat("{0} Tj\n", EncodeText(Text.TextShaper.Process(word.Text, word.Font), word.Font));
                     if (word.Underline)
                         ulSegments.Add((cursorX, pdfY, word.Width, word.FontSize, word.Color));
 
