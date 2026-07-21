@@ -149,6 +149,58 @@ public class CsvTableBenchmark
         return ms.ToArray();
     }
 
+#if INCLUDE_ITEXT
+    [Benchmark(Description = "iText")]
+    public byte[] IText()
+    {
+        using var ms = new MemoryStream();
+        var writer = new iText.Kernel.Pdf.PdfWriter(ms);
+        var pdf = new iText.Kernel.Pdf.PdfDocument(writer);
+        pdf.SetDefaultPageSize(iText.Kernel.Geom.PageSize.LETTER.Rotate());
+        var document = new iText.Layout.Document(pdf);
+
+        var headerFont = iText.Kernel.Font.PdfFontFactory.CreateFont(
+            iText.IO.Font.Constants.StandardFonts.HELVETICA_BOLD);
+        var cellFontObj = iText.Kernel.Font.PdfFontFactory.CreateFont(
+            iText.IO.Font.Constants.StandardFonts.HELVETICA);
+
+        float[] colWidths = { 60, 120, 100, 60, 80, 80 };
+        var table = new iText.Layout.Element.Table(
+            iText.Layout.Properties.UnitValue.CreatePointArray(colWidths));
+
+        // Header
+        foreach (var h in _headers)
+        {
+            table.AddHeaderCell(new iText.Layout.Element.Cell()
+                .Add(new iText.Layout.Element.Paragraph(h)
+                    .SetFont(headerFont).SetFontSize(10)
+                    .SetFontColor(iText.Kernel.Colors.ColorConstants.WHITE))
+                .SetBackgroundColor(new iText.Kernel.Colors.DeviceRgb(51, 51, 51))
+                .SetPadding(4));
+        }
+
+        // Data rows
+        for (int r = 0; r < _parsedRows.Length; r++)
+        {
+            bool alt = r % 2 == 1;
+            foreach (var cellText in _parsedRows[r])
+            {
+                var cell = new iText.Layout.Element.Cell()
+                    .Add(new iText.Layout.Element.Paragraph(cellText)
+                        .SetFont(cellFontObj).SetFontSize(10))
+                    .SetPadding(4);
+                if (alt)
+                    cell.SetBackgroundColor(new iText.Kernel.Colors.DeviceRgb(242, 242, 242));
+                table.AddCell(cell);
+            }
+        }
+
+        document.Add(table);
+        document.Close();
+        return ms.ToArray();
+    }
+#endif
+
     [Benchmark(Description = "QuestPDF")]
     public byte[] QuestPdf()
     {

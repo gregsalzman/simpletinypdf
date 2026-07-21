@@ -108,10 +108,47 @@ namespace SimpleTinyPDF
 
             // 6. Pages
             var pageObjRefs = new List<string>();
-            var pageDicts = new Dictionary<PdfPage, PdfDict>();
+            var pageDicts = new Dictionary<PdfPage, PdfObj>();
+
+            // Imported pages: one ref map per import context; the whole closure of shared
+            // objects (fonts, images, content streams) is emitted once per context.
+            var importRefMaps = new Dictionary<ImportContext, Dictionary<PdfObjectId, PdfObj>>();
+
+            void EmitImportedPage(PdfPage page)
+            {
+                var content = page.Imported;
+                if (!importRefMaps.TryGetValue(content.Context, out var refMap))
+                {
+                    refMap = new Dictionary<PdfObjectId, PdfObj>();
+                    importRefMaps[content.Context] = refMap;
+                    foreach (var kv in content.Context.ClonedObjects)
+                    {
+                        // Deep-clone when encrypting so the shared closure survives repeated saves
+                        var body = doc.Encryption != null ? CosCloner.Clone(kv.Value) : kv.Value;
+                        refMap[kv.Key] = AddObj(new ImportedObj { Body = body, RefMap = refMap });
+                    }
+                }
+                // The page body is always cloned: it may be mutated during this save
+                // (signature widget injection, encryption) and must stay reusable
+                var pageBody = CosCloner.Clone(content.PageDict);
+                var pageObj = new ImportedObj { Body = pageBody, RefMap = refMap, ParentTarget = pagesNode };
+                AddObj(pageObj);
+                pageObjRefs.Add(pageObj.Ref);
+                pageDicts[page] = pageObj;
+            }
 
             foreach (var page in doc.Pages)
             {
+                if (page.IsImported)
+                {
+                    if (page.HasGeneratedContent)
+                        throw new InvalidOperationException(
+                            "Drawing or adding annotations/form fields on an imported page is not supported yet. " +
+                            "Draw on a new page instead.");
+                    EmitImportedPage(page);
+                    continue;
+                }
+
                 // Font objects for this page
                 var usedFonts = page.GetUsedFonts();
                 var fontRefParts = new List<string>();
@@ -313,6 +350,28 @@ namespace SimpleTinyPDF
                 pageDicts[page] = pageDict;
             }
 
+            // Restore document-level rendering keys from imported sources. /OutputIntents
+            // (with /S /GTS_PDFX) and the XMP /Metadata carry PDF/X identity — without them
+            // Acrobat's default "overprint preview only for PDF/X" turns off overprint
+            // simulation and prepress content renders incorrectly. First source wins.
+            foreach (var contextEntry in importRefMaps)
+            {
+                var importContext = contextEntry.Key;
+                var contextRefMap = contextEntry.Value;
+                if (importContext.OutputIntents != null && !catalog.Entries.Exists(e => e.Key == "OutputIntents"))
+                {
+                    var sb = new StringBuilder();
+                    CosSerializer.AppendValue(sb, importContext.OutputIntents, contextRefMap);
+                    catalog.Set("OutputIntents", sb.ToString());
+                }
+                if (importContext.Metadata != null && !catalog.Entries.Exists(e => e.Key == "Metadata"))
+                {
+                    var sb = new StringBuilder();
+                    CosSerializer.AppendValue(sb, importContext.Metadata, contextRefMap);
+                    catalog.Set("Metadata", sb.ToString());
+                }
+            }
+
             // Second pass: annotations (after all page dicts exist for internal links)
             foreach (var page in doc.Pages)
             {
@@ -399,7 +458,7 @@ namespace SimpleTinyPDF
                         AddObj(annotDict);
                         annotRefs.Add(annotDict.Ref);
                     }
-                    pageDicts[page].Set("Annots", "[" + string.Join(" ", annotRefs) + "]");
+                    ((PdfDict)pageDicts[page]).Set("Annots", "[" + string.Join(" ", annotRefs) + "]");
                 }
             }
 
@@ -506,18 +565,18 @@ namespace SimpleTinyPDF
                         if (!radioGroups.ContainsKey(field.RadioGroup))
                             radioGroups[field.RadioGroup] = new List<(FormField, PdfDict)>();
 
-                        var rbWidget = CreateFormWidget(field, pageDicts[page], objects, AddObj,
+                        var rbWidget = CreateFormWidget(field, (PdfDict)pageDicts[page], objects, AddObj,
                             drFontParts, drFontNames, isRadioChild: true, ref formFontObj);
                         radioGroups[field.RadioGroup].Add((field, rbWidget));
                         continue;
                     }
 
-                    var widget = CreateFormWidget(field, pageDicts[page], objects, AddObj,
+                    var widget = CreateFormWidget(field, (PdfDict)pageDicts[page], objects, AddObj,
                         drFontParts, drFontNames, isRadioChild: false, ref formFontObj);
                     fieldRefs.Add(widget.Ref);
 
                     // Add widget to page annots
-                    AppendAnnotToPage(pageDicts[page], widget);
+                    AppendAnnotToPage((PdfDict)pageDicts[page], widget);
                 }
 
                 // Process radio groups
@@ -547,7 +606,7 @@ namespace SimpleTinyPDF
                     {
                         widget.Set("Parent", parentField.Ref);
                         kidsRefs.Add(widget.Ref);
-                        AppendAnnotToPage(pageDicts[page], widget);
+                        AppendAnnotToPage((PdfDict)pageDicts[page], widget);
                     }
                     parentField.Set("Kids", "[" + string.Join(" ", kidsRefs) + "]");
                     fieldRefs.Add(parentField.Ref);
@@ -642,7 +701,22 @@ namespace SimpleTinyPDF
                 fieldRefs.Add(sigField.Ref);
 
                 if (sigPageDict != null)
-                    AppendAnnotToPage(sigPageDict, sigField);
+                {
+                    if (sigPageDict is PdfDict sigPageDictTyped)
+                    {
+                        AppendAnnotToPage(sigPageDictTyped, sigField);
+                    }
+                    else if (sigPageDict is ImportedObj importedPage && importedPage.Body is CosDict importedBody)
+                    {
+                        var annots = importedBody.Get("Annots") as CosArray;
+                        if (annots == null)
+                        {
+                            annots = new CosArray();
+                            importedBody.Set("Annots", annots);
+                        }
+                        annots.Items.Add(new CosWriterRef(sigField));
+                    }
+                }
 
                 // Ensure Helvetica is in DR for signature appearance
                 if (!drFontNames.Contains("Helvetica"))
@@ -719,6 +793,12 @@ namespace SimpleTinyPDF
                 pdfVersion = doc.Encryption.Level == PdfEncryptionLevel.Aes256 ? "2.0" : "1.6";
             else if (doc.Signature != null || fieldRefs.Count > 0)
                 pdfVersion = "1.6";
+            // Imported pages may rely on features from a newer PDF version than we generate
+            foreach (var context in importRefMaps.Keys)
+            {
+                if (string.CompareOrdinal(context.PdfVersion, pdfVersion) > 0)
+                    pdfVersion = context.PdfVersion;
+            }
             w.WriteAscii($"%PDF-{pdfVersion}\n");
             w.WriteBytes(new byte[] { 0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A }); // binary comment
 
@@ -881,6 +961,12 @@ namespace SimpleTinyPDF
 
         private static void EncryptObject(PdfObj obj, PdfEncryptor encryptor)
         {
+            if (obj is ImportedObj imported)
+            {
+                EncryptCosValue(imported.Body, encryptor, obj.ObjectNumber);
+                return;
+            }
+
             if (obj is PdfStream stream)
                 stream.Data = encryptor.EncryptStream(stream.Data, obj.ObjectNumber, 0);
 
@@ -898,6 +984,33 @@ namespace SimpleTinyPDF
                             entry.Key, "<" + PdfEncryptor.BytesToHex(encrypted) + ">");
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Encrypts every string and stream inside an imported object's value tree.
+        /// Stream bytes are encrypted in their stored (filtered) form, as the spec requires.
+        /// </summary>
+        private static void EncryptCosValue(CosValue value, PdfEncryptor encryptor, int objectNumber)
+        {
+            switch (value)
+            {
+                case CosString s:
+                    s.Raw = encryptor.EncryptString(s.Raw ?? Array.Empty<byte>(), objectNumber, 0);
+                    break;
+                case CosStream stream:
+                    stream.RawData = encryptor.EncryptStream(stream.RawData ?? Array.Empty<byte>(), objectNumber, 0);
+                    foreach (var kv in stream.Entries)
+                        EncryptCosValue(kv.Value, encryptor, objectNumber);
+                    break;
+                case CosDict dict:
+                    foreach (var kv in dict.Entries)
+                        EncryptCosValue(kv.Value, encryptor, objectNumber);
+                    break;
+                case CosArray array:
+                    foreach (var item in array.Items)
+                        EncryptCosValue(item, encryptor, objectNumber);
+                    break;
             }
         }
 

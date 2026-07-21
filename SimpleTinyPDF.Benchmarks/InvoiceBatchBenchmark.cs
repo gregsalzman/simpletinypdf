@@ -319,6 +319,168 @@ public class InvoiceBatchBenchmark
         return ms.ToArray();
     }
 
+#if INCLUDE_ITEXT
+    [Benchmark(Description = "iText")]
+    public byte[] IText()
+    {
+        using var ms = new MemoryStream();
+        var writer = new iText.Kernel.Pdf.PdfWriter(ms);
+        var pdf = new iText.Kernel.Pdf.PdfDocument(writer);
+        pdf.SetDefaultPageSize(iText.Kernel.Geom.PageSize.LETTER);
+        var document = new iText.Layout.Document(pdf);
+
+        var boldFont14 = iText.Kernel.Font.PdfFontFactory.CreateFont(
+            iText.IO.Font.Constants.StandardFonts.HELVETICA_BOLD);
+        var boldFont = iText.Kernel.Font.PdfFontFactory.CreateFont(
+            iText.IO.Font.Constants.StandardFonts.HELVETICA_BOLD);
+        var normalFont = iText.Kernel.Font.PdfFontFactory.CreateFont(
+            iText.IO.Font.Constants.StandardFonts.HELVETICA);
+        var italicFont = iText.Kernel.Font.PdfFontFactory.CreateFont(
+            iText.IO.Font.Constants.StandardFonts.HELVETICA_OBLIQUE);
+
+        var darkGray = new iText.Kernel.Colors.DeviceRgb(84, 84, 84);
+        var headerBg = new iText.Kernel.Colors.DeviceRgb(51, 51, 51);
+        var altBg = new iText.Kernel.Colors.DeviceRgb(242, 242, 242);
+        var lightGray = new iText.Kernel.Colors.DeviceRgb(212, 212, 212);
+        var titleColor = new iText.Kernel.Colors.DeviceRgb(51, 51, 51);
+
+        for (int inv = 1; inv <= InvoiceData.BatchSize; inv++)
+        {
+            if (inv > 1)
+                document.Add(new iText.Layout.Element.AreaBreak(
+                    iText.Layout.Properties.AreaBreakType.NEXT_PAGE));
+
+            // Company info (right-aligned)
+            document.Add(new iText.Layout.Element.Paragraph(InvoiceData.CompanyName)
+                .SetFont(boldFont14).SetFontSize(14)
+                .SetTextAlignment(iText.Layout.Properties.TextAlignment.RIGHT)
+                .SetMarginBottom(0));
+            document.Add(new iText.Layout.Element.Paragraph(InvoiceData.CompanyAddress)
+                .SetFont(normalFont).SetFontSize(9).SetFontColor(darkGray)
+                .SetTextAlignment(iText.Layout.Properties.TextAlignment.RIGHT)
+                .SetMarginBottom(0).SetMarginTop(0));
+            document.Add(new iText.Layout.Element.Paragraph(InvoiceData.CompanyPhone)
+                .SetFont(normalFont).SetFontSize(9).SetFontColor(darkGray)
+                .SetTextAlignment(iText.Layout.Properties.TextAlignment.RIGHT)
+                .SetMarginTop(0));
+
+            // Divider
+            document.Add(new iText.Layout.Element.LineSeparator(
+                new iText.Kernel.Pdf.Canvas.Draw.SolidLine(1))
+                .SetStrokeColor(lightGray));
+
+            // Invoice title
+            document.Add(new iText.Layout.Element.Paragraph("INVOICE")
+                .SetFont(boldFont).SetFontSize(24).SetFontColor(titleColor));
+
+            // Invoice details + bill to as a 2-column table
+            var detailsTable = new iText.Layout.Element.Table(
+                iText.Layout.Properties.UnitValue.CreatePercentArray(new float[] { 1, 1 }))
+                .UseAllAvailableWidth().SetBorder(iText.Layout.Borders.Border.NO_BORDER);
+
+            var leftCell = new iText.Layout.Element.Cell()
+                .SetBorder(iText.Layout.Borders.Border.NO_BORDER);
+            leftCell.Add(new iText.Layout.Element.Paragraph($"Invoice #: {inv}")
+                .SetFont(normalFont).SetFontSize(10).SetMarginBottom(0));
+            leftCell.Add(new iText.Layout.Element.Paragraph("Date: April 16, 2026")
+                .SetFont(normalFont).SetFontSize(10).SetMarginBottom(0).SetMarginTop(0));
+            leftCell.Add(new iText.Layout.Element.Paragraph("Due: May 16, 2026")
+                .SetFont(normalFont).SetFontSize(10).SetMarginTop(0));
+
+            var rightCell = new iText.Layout.Element.Cell()
+                .SetBorder(iText.Layout.Borders.Border.NO_BORDER);
+            rightCell.Add(new iText.Layout.Element.Paragraph("Bill To:")
+                .SetFont(boldFont).SetFontSize(10).SetMarginBottom(0));
+            rightCell.Add(new iText.Layout.Element.Paragraph(InvoiceData.BillToName)
+                .SetFont(normalFont).SetFontSize(10).SetMarginBottom(0).SetMarginTop(0));
+            rightCell.Add(new iText.Layout.Element.Paragraph(InvoiceData.BillToAddress)
+                .SetFont(normalFont).SetFontSize(10).SetMarginBottom(0).SetMarginTop(0));
+            rightCell.Add(new iText.Layout.Element.Paragraph(InvoiceData.BillToCityState)
+                .SetFont(normalFont).SetFontSize(10).SetMarginTop(0));
+
+            detailsTable.AddCell(leftCell);
+            detailsTable.AddCell(rightCell);
+            document.Add(detailsTable);
+
+            // Line items table
+            float[] colWidths = { 240, 80, 80, 112 };
+            var table = new iText.Layout.Element.Table(
+                iText.Layout.Properties.UnitValue.CreatePointArray(colWidths));
+
+            string[] headers = { "Description", "Quantity", "Unit Price", "Amount" };
+            var alignments = new[] {
+                iText.Layout.Properties.TextAlignment.LEFT,
+                iText.Layout.Properties.TextAlignment.CENTER,
+                iText.Layout.Properties.TextAlignment.RIGHT,
+                iText.Layout.Properties.TextAlignment.RIGHT
+            };
+
+            for (int c = 0; c < 4; c++)
+            {
+                table.AddHeaderCell(new iText.Layout.Element.Cell()
+                    .Add(new iText.Layout.Element.Paragraph(headers[c])
+                        .SetFont(boldFont).SetFontSize(10)
+                        .SetFontColor(iText.Kernel.Colors.ColorConstants.WHITE)
+                        .SetTextAlignment(alignments[c]))
+                    .SetBackgroundColor(headerBg).SetPadding(4));
+            }
+
+            for (int r = 0; r < InvoiceData.LineItems.Length; r++)
+            {
+                var item = InvoiceData.LineItems[r];
+                string[] cells = { item.Desc, item.Qty, item.Price, item.Amount };
+                bool alt = r % 2 == 1;
+                for (int c = 0; c < 4; c++)
+                {
+                    var cell = new iText.Layout.Element.Cell()
+                        .Add(new iText.Layout.Element.Paragraph(cells[c])
+                            .SetFont(normalFont).SetFontSize(10)
+                            .SetTextAlignment(alignments[c]))
+                        .SetPadding(4);
+                    if (alt) cell.SetBackgroundColor(altBg);
+                    table.AddCell(cell);
+                }
+            }
+
+            document.Add(table);
+
+            // Totals
+            var totalsTable = new iText.Layout.Element.Table(
+                iText.Layout.Properties.UnitValue.CreatePercentArray(new float[] { 1, 1 }))
+                .SetWidth(iText.Layout.Properties.UnitValue.CreatePercentValue(40))
+                .SetHorizontalAlignment(iText.Layout.Properties.HorizontalAlignment.RIGHT)
+                .SetBorder(iText.Layout.Borders.Border.NO_BORDER);
+
+            void AddTotalRow(string label, string value, bool isBold)
+            {
+                var font = isBold ? boldFont : normalFont;
+                var size = isBold ? 12 : 10;
+                totalsTable.AddCell(new iText.Layout.Element.Cell()
+                    .Add(new iText.Layout.Element.Paragraph(label).SetFont(font).SetFontSize(size))
+                    .SetBorder(iText.Layout.Borders.Border.NO_BORDER));
+                totalsTable.AddCell(new iText.Layout.Element.Cell()
+                    .Add(new iText.Layout.Element.Paragraph(value).SetFont(font).SetFontSize(size)
+                        .SetTextAlignment(iText.Layout.Properties.TextAlignment.RIGHT))
+                    .SetBorder(iText.Layout.Borders.Border.NO_BORDER));
+            }
+
+            AddTotalRow("Subtotal:", InvoiceData.Subtotal, false);
+            AddTotalRow("Tax (8%):", InvoiceData.Tax, false);
+            AddTotalRow("Total Due:", InvoiceData.Total, true);
+            document.Add(totalsTable);
+
+            // Footer
+            document.Add(new iText.Layout.Element.Paragraph(InvoiceData.FooterNote)
+                .SetFont(italicFont).SetFontSize(9).SetFontColor(darkGray)
+                .SetTextAlignment(iText.Layout.Properties.TextAlignment.CENTER)
+                .SetMarginTop(30));
+        }
+
+        document.Close();
+        return ms.ToArray();
+    }
+#endif
+
     [Benchmark(Description = "QuestPDF")]
     public byte[] QuestPdf()
     {

@@ -8,11 +8,26 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <!-- iText is AGPL-licensed and therefore not referenced by default, keeping this
+       MIT repo free of AGPL packages for license scanners. To benchmark against iText,
+       set the property as an ENVIRONMENT variable so BenchmarkDotNet's child builds
+       see it too (a -p: switch does not reach them):
+         PowerShell:  $env:IncludeIText = 'true'; dotnet run -c Release
+         bash:        IncludeIText=true dotnet run -c Release -->
+  <PropertyGroup Condition="'$(IncludeIText)' == 'true'">
+    <DefineConstants>$(DefineConstants);INCLUDE_ITEXT</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.14.*" />
     <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.4" />
     <PackageReference Include="QuestPDF" Version="2026.5.*" />
     <PackageReference Include="IronPdf" Version="2026.5.*" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(IncludeIText)' == 'true'">
+    <PackageReference Include="itext" Version="9.6.0" />
+    <PackageReference Include="itext.bouncy-castle-adapter" Version="9.6.0" />
   </ItemGroup>
 
   <ItemGroup>

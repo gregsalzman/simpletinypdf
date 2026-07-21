@@ -26,6 +26,7 @@ A small-but-mighty zero-dependency PDF generation library for .NET.  It is faste
   - [Barcodes](#barcodes)
   - [Form Fields (AcroForms)](#form-fields-acroforms)
   - [Digital Signatures](#digital-signatures)
+  - [Editing Existing PDFs](#editing-existing-pdfs)
 - [Example: Invoice with Company Logo](#example-invoice-with-company-logo)
 - [Example: CSV to Table Report](#example-csv-to-table-report)
 - [Version History](#version-history)
@@ -46,6 +47,7 @@ A small-but-mighty zero-dependency PDF generation library for .NET.  It is faste
 - **Encryption** — AES-128 and AES-256 password protection with configurable user/owner passwords and granular permission flags (print, copy, modify, annotate, etc.)
 - **Form Fields (AcroForms)** — text fields (single/multi-line, password), checkboxes, radio buttons, dropdowns (combo boxes), listboxes (single/multi-select), and push buttons; editable in Adobe Acrobat and other PDF viewers
 - **Digital Signatures** — PKCS#7 detached signatures with X.509 certificates; visible or invisible; optional RFC 3161 timestamping from built-in or custom TSA servers; HSM/smart card/cloud KMS support via custom signer delegate
+- **Editing existing PDFs** — open any unencrypted PDF (including files with cross-reference streams and object streams) and merge, split, extract, delete, rearrange, or insert pages; mix imported pages with generated ones; encrypt or sign the result; automatic repair of files with broken cross-reference tables
 - **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) plus TrueType (.ttf) and OpenType (.otf) font embedding with full Unicode support including supplementary planes (CJK, Cyrillic, Greek, Arabic, CJK Extension B, enclosed alphanumerics, etc.). TrueType fonts are automatically subsetted to include only the glyphs used in the document
 - **Colors** — RGB, CMYK, grayscale, and spot colors (Separation) with CMYK fallback and tint control
 - **Unit conversion** — convert between points, inches, centimeters, and millimeters; fractional inch support ("1-1/8", "1 1/8", "3/4")
@@ -87,7 +89,8 @@ See the full [Invoice example](#example-invoice-with-company-logo) and [CSV Tabl
 
 - HTML-to-PDF conversion
 - Full OpenType shaping — font-specific ligatures, precise diacritic positioning, or Nastaliq-style Urdu (standard Arabic and Hebrew are supported; see [Right-to-Left Text](#right-to-left-text-arabic-hebrew))
-- PDF reading, parsing, or editing
+- Content-level editing of existing PDFs — changing text, replacing images, or stamping onto existing pages (page-level operations — merge, split, extract, delete, rearrange — are supported; see [Editing Existing PDFs](#editing-existing-pdfs))
+- Extracting text or images from existing PDFs
 
 ## Size Comparison
 
@@ -95,52 +98,51 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~227 KB** | **~227 KB** | **1x** | No |
-| **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 28x | No |
-| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 63x | No (BouncyCastle ~8 MB) |
-| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 162x | Yes (bundled Skia) |
-| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 1,128x | Yes (bundled Chromium) |
-
-The v0.80 right-to-left text support (full UAX #9 bidirectional algorithm, Arabic shaper, and Unicode data tables) added about 35 KB — the entire feature is smaller than a typical favicon. For comparison, adding RTL via HarfBuzzSharp would add roughly 8 MB of native binaries across platforms.
+| **SimpleTinyPDF** | **~259 KB** | **~259 KB** | **1x** | No |
+| **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 25x | No |
+| **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 55x | No (BouncyCastle ~8 MB) |
+| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 143x | Yes (bundled Skia) |
+| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 990x | Yes (bundled Chromium) |
 
 PDFsharp is shown with MigraDoc (its document-model layer) since most real-world usage relies on MigraDoc for tables, paragraphs, and auto-pagination — raw PDFsharp alone is ~4.4 MB. IronPDF's footprint includes the Chromium rendering engine downloaded at build/runtime. QuestPDF bundles custom Skia native binaries for cross-platform rendering.
 
+The v0.90 PDF reader/editor (parser, cross-reference handling, page importer) added about 31 KB to the assembly — the whole editing feature costs less than half of one percent of the next-smallest library's footprint.
+
 ## Performance Comparison
 
-Benchmarked with [BenchmarkDotNet](https://benchmarkdotnet.org/) on Windows 11, Intel Core 7 150U (10 cores), .NET 9.0.16. All output is generated in-memory (`byte[]`). IronPDF could not be benchmarked (requires a commercial license in Release builds). PDFsharp is benchmarked via MigraDoc (its document-model layer with tables, paragraphs, and auto-pagination) for a fair API-level comparison. See the [SimpleTinyPDF.Benchmarks](SimpleTinyPDF.Benchmarks/) project to run these yourself.
+Benchmarked with [BenchmarkDotNet](https://benchmarkdotnet.org/) on Windows 11, Intel Core 7 150U (10 cores), .NET 9.0.18. All rows in all three tables come from a single benchmark session on an idle, freshly rebooted machine (July 2026, at v0.90). All output is generated in-memory (`byte[]`). IronPDF could not be benchmarked (requires a commercial license in Release builds). PDFsharp is benchmarked via MigraDoc (its document-model layer with tables, paragraphs, and auto-pagination) for a fair API-level comparison. Because iText is AGPL-licensed, it is not referenced by the benchmark project by default — its benchmarks are gated behind an opt-in MSBuild property (set the `IncludeIText=true` environment variable) so this MIT repo stays free of AGPL packages; the iText rows were measured in the same session with that flag enabled. See the [SimpleTinyPDF.Benchmarks](SimpleTinyPDF.Benchmarks/) project to run these yourself.
 
 **Scenario 1 — 10,000-row CSV table** (landscape, auto-paginated with header repeat and alternate row shading):
 
 | Library | Mean | Allocated | vs SimpleTinyPDF |
 |---|---|---|---|
-| **SimpleTinyPDF** | **163 ms** | **173 MB** | **1x** |
-| **PDFsharp + MigraDoc** 6.2.4 | 4,465 ms | 845 MB | 27x slower |
-| **iText** 9.6.0 | 6,987 ms | 1,986 MB | 43x slower |
-| **QuestPDF** 2026.5 | 1,303 ms | 284 MB | 8x slower |
+| **SimpleTinyPDF** | **183 ms** | **173 MB** | **1x** |
+| **PDFsharp + MigraDoc** 6.2.4 | 4,441 ms | 845 MB | 24x slower |
+| **iText** 9.6.0 | 7,849 ms | 1,986 MB | 43x slower |
+| **QuestPDF** 2026.5 | 1,342 ms | 284 MB | 7x slower |
 | **IronPDF** 2026.5 | N/A | N/A | — |
 
 **Scenario 2 — 1,000-invoice batch** (each invoice: header, details, 3-row line items table, totals, footer):
 
 | Library | Mean | Allocated | vs SimpleTinyPDF |
 |---|---|---|---|
-| **SimpleTinyPDF** | **107 ms** | **74 MB** | **1x** |
-| **PDFsharp + MigraDoc** 6.2.4 | 727 ms | 559 MB | 7x slower |
-| **iText** 9.6.0 | 2,671 ms | 1,062 MB | 25x slower |
-| **QuestPDF** 2026.5 | 975 ms | 224 MB | 9x slower |
+| **SimpleTinyPDF** | **114 ms** | **75 MB** | **1x** |
+| **PDFsharp + MigraDoc** 6.2.4 | 1,048 ms | 559 MB | 9x slower |
+| **iText** 9.6.0 | 2,768 ms | 1,062 MB | 24x slower |
+| **QuestPDF** 2026.5 | 1,011 ms | 224 MB | 9x slower |
 | **IronPDF** 2026.5 | N/A | N/A | — |
 
 **Scenario 3 — Multi-page flowing report** (50 paragraphs with chapter headings, headers/footers with page numbers, summary table; uses `PdfDocumentLayout` with sections, columns, and page events):
 
 | Library | Mean | Allocated | vs SimpleTinyPDF |
 |---|---|---|---|
-| **SimpleTinyPDF** (Layout) | **1.055 ms** | **1,753 KB** | **1x** |
-| **PDFsharp + MigraDoc** 6.2.4 | 13.513 ms | 19,465 KB | 13x slower |
-| **QuestPDF** 2026.5 | 18.347 ms | 838 KB | 17x slower |
+| **SimpleTinyPDF** (Layout) | **1.21 ms** | **1,785 KB** | **1x** |
+| **PDFsharp + MigraDoc** 6.2.4 | 13.13 ms | 19,466 KB | 11x slower |
+| **QuestPDF** 2026.5 | 19.00 ms | 838 KB | 16x slower |
 | **IronPDF** 2026.5 | N/A | N/A | — |
 
-SimpleTinyPDF is the fastest library in all three scenarios. In the layout report benchmark (Scenario 3), SimpleTinyPDF's new `PdfDocumentLayout` engine is 13x faster than MigraDoc and 17x faster than QuestPDF while using a fraction of the memory compared to MigraDoc. QuestPDF achieves lower memory allocation but is significantly slower. In the data-heavy scenarios (1 and 2), SimpleTinyPDF leads by 7–43x in speed with substantially lower memory allocation.
+SimpleTinyPDF is the fastest library in all three scenarios. In the layout report benchmark (Scenario 3), SimpleTinyPDF's `PdfDocumentLayout` engine is 11x faster than MigraDoc and 16x faster than QuestPDF while using a fraction of the memory compared to MigraDoc. QuestPDF achieves lower memory allocation but is significantly slower. In the data-heavy scenarios (1 and 2), SimpleTinyPDF leads by 7–43x in speed with substantially lower memory allocation.
 
-**v0.80 note:** the SimpleTinyPDF scenarios were re-benchmarked after adding right-to-left text support and are unchanged within run-to-run noise (Scenario 1: ~170 ms, Scenario 2: ~80 ms, Scenario 3: ~1.1 ms; allocations identical). Text that contains no RTL characters pays only a single fast range-check scan per drawn string — the bidirectional algorithm and Arabic shaper run only when a string actually contains Arabic, Hebrew, or bidi control characters.
 
 ## API Reference
 
@@ -175,6 +177,9 @@ byte[] bytes = doc.ToArray(); // get as byte array
 | `AddPage(PageSize)` | Append a new page (defaults to A4) |
 | `InsertPage(int, PageSize)` | Insert a page at a 1-based position |
 | `AddImage(PdfImage)` | Register an image (deduplicates identical content) |
+| `ImportPage(...)` / `ImportPages(...)` | Copy pages from an existing PDF (see [Editing Existing PDFs](#editing-existing-pdfs)) |
+| `RemovePage(int)` / `MovePage(int, int)` | Delete or reorder pages |
+| `Merge(...)` | Static: combine existing PDFs into one document |
 | `Save(string)` / `Save(Stream)` | Write PDF to file or stream |
 | `ToArray()` | Return PDF as a byte array |
 
@@ -1088,6 +1093,88 @@ doc.Signature = new PdfSignatureOptions
 | `TimestampServer` | `None` | Built-in TSA: `None`, `DigiCert`, `Sectigo`, `FreeTSA` |
 | `TimestampServerUrl` | null | Custom RFC 3161 TSA URL |
 
+### Editing Existing PDFs
+
+Open an existing PDF with `PdfReadDocument.Open`, then copy pages into a `PdfDocument` with `ImportPage` / `ImportPages`. Imported pages keep their full appearance — content, fonts, images, vector graphics, links — and can be freely mixed with generated pages.
+
+```csharp
+// Merge several PDFs into one
+var merged = PdfDocument.Merge("chapter1.pdf", "chapter2.pdf", "chapter3.pdf");
+merged.Save("book.pdf");
+
+// Extract pages 2-4 into a new document
+using (var source = PdfReadDocument.Open("report.pdf"))
+{
+    var extract = new PdfDocument();
+    extract.ImportPages(source, 2, 4);
+    extract.Save("excerpt.pdf");
+}
+
+// Split a PDF into single-page files
+using (var source = PdfReadDocument.Open("input.pdf"))
+{
+    for (int i = 1; i <= source.PageCount; i++)
+    {
+        var single = new PdfDocument();
+        single.ImportPage(source, i);
+        single.Save($"page-{i}.pdf");
+    }
+}
+
+// Add a generated cover page in front of an existing document
+using (var source = PdfReadDocument.Open("existing.pdf"))
+{
+    var doc = new PdfDocument();
+    var cover = doc.AddPage();
+    cover.DrawText("Cover Page", 50, 100, PdfFont.HelveticaBold, 32);
+    doc.ImportPages(source, 1, source.PageCount);
+    doc.Save("with-cover.pdf");
+}
+
+// Delete and reorder pages
+using (var source = PdfReadDocument.Open("input.pdf"))
+{
+    var doc = new PdfDocument();
+    doc.ImportPages(source, 1, source.PageCount);
+    doc.RemovePage(2);      // delete page 2
+    doc.MovePage(3, 1);     // move page 3 to the front
+    doc.Save("rearranged.pdf");
+}
+```
+
+**`PdfReadDocument`**
+
+| Member | Description |
+|---|---|
+| `Open(string)` / `Open(Stream)` / `Open(byte[])` | Open an existing PDF for reading |
+| `PageCount` | Number of pages |
+| `GetPageSize(int)` | Size of a page in points (1-based) |
+| `Title` / `Author` | Document metadata |
+| `Dispose()` | Release the in-memory copy (already-imported pages stay valid) |
+
+**`PdfDocument` page operations**
+
+| Member | Description |
+|---|---|
+| `ImportPage(source, pageNumber)` | Append one page from an existing PDF |
+| `ImportPage(source, pageNumber, insertAt)` | Insert an imported page at a 1-based position |
+| `ImportPages(source, first, last)` | Import a consecutive page range |
+| `ImportPages(source, params int[])` | Import specific pages in a given order (repeats allowed) |
+| `RemovePage(pageNumber)` | Delete a page (generated or imported) |
+| `MovePage(from, to)` | Reorder pages |
+| `Merge(params PdfReadDocument[])` | Static: combine opened documents |
+| `Merge(params string[])` | Static: combine PDF files by path |
+
+Notes and current limitations:
+
+- **Saving is a full rewrite.** The output is a brand-new, cleanly built PDF. Any digital signatures present in a *source* file are therefore not carried over (you can freshly sign the result with `doc.Signature`). Encrypting the merged result with `doc.Encryption` works normally.
+- Pages imported from the same `PdfReadDocument` share their fonts, images, and other resources in the output — importing 10 pages that use the same font embeds that font once.
+- Reads classic cross-reference tables, cross-reference streams, object streams (PDF 1.5+), incremental updates, and hybrid-reference files. Files with a damaged cross-reference table are repaired automatically by scanning when possible.
+- PDF/X identity is preserved: the source's `/OutputIntents` (e.g. `GTS_PDFX`) and XMP metadata are carried onto the output catalog, so viewers like Acrobat keep simulating overprint for imported prepress content. When merging multiple sources, the first source that provides them wins.
+- Form-field widgets and in-document navigation (bookmarks, GoTo links) are not copied from source files; URI links, text notes, markup, and stamps on imported pages are preserved.
+- Password-protected source files are not supported yet (`Open` throws `NotSupportedException`).
+- Drawing on an imported page (stamping/watermarking) is not supported yet — saving such a document throws `InvalidOperationException`.
+
 ### Document Layout
 
 `PdfDocumentLayout` provides automatic content flow, pagination, headers/footers with page numbering, and two-pass rendering for accurate total page counts. Add paragraphs, rich text, images, tables, and lists — content flows across pages automatically.
@@ -1657,6 +1744,7 @@ doc.Save("sales-report.pdf");
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.90 | July 16, 2026 | Add editing of existing PDFs: open any unencrypted PDF with `PdfReadDocument.Open`, then merge, split, extract, delete, rearrange, or insert pages via `ImportPage` / `ImportPages` / `RemovePage` / `MovePage` / `PdfDocument.Merge`. Imported pages mix freely with generated pages and preserve full appearance; resources shared between imported pages are deduplicated. Pure C# PDF parser supports classic xref tables, cross-reference streams, object streams, incremental updates, hybrid-reference files, and automatic repair of broken cross-reference data. Merged output can be encrypted and digitally signed. Saving is a full rewrite (source signatures are not carried over). |
 | 0.80 | July 12, 2026 | Add right-to-left text support for Arabic and Hebrew. Pure C# Unicode Bidirectional Algorithm (UAX #9, adapted from RichTextKit) resolves mixed RTL/LTR lines with correct digit ordering, bracket pairing, and mirroring; Arabic contextual shaping via Unicode presentation forms handles letter joining, lam-alef ligatures, tashkeel marks, and Persian/Urdu extended letters. Works automatically with logical-order input in single-line, wrapped, and justified text — no API changes, no new dependencies (~35 KB). |
 | 0.72 | July 3, 2026 | Add advanced layout controls: paragraph indentation (`LeftIndent`, `RightIndent`, `FirstLineIndent` with hanging indent support), `KeepTogether` / `KeepWithNext` pagination control, horizontal rules (`AddHorizontalRule`), single-pass lazy rendering for large documents (`LazyRendering`), and debug helpers (`DebugOptions`: margin/column guides, element bounds, layout warnings). |
 | 0.71 | June 27, 2026 | Add document sections with independent page size, margins, and headers/footers per section (`AddSection`), multi-column text flow (`ColumnCount`, `ColumnGap`, `AddColumnBreak`), page lifecycle events (`IPageEventHandler` / `PageEventType`), and custom renderers (`CustomRenderer` base class) to the layout engine. Section page numbering with optional restart. |

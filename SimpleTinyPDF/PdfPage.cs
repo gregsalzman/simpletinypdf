@@ -45,6 +45,26 @@ namespace SimpleTinyPDF
             Height = height;
         }
 
+        internal PdfPage(ImportedPageContent imported, float width, float height)
+            : this(width, height)
+        {
+            Imported = imported;
+        }
+
+        /// <summary>The imported payload when this page came from an existing PDF, otherwise null.</summary>
+        internal ImportedPageContent Imported { get; }
+
+        /// <summary>
+        /// True when this page was imported from an existing PDF via
+        /// <see cref="PdfDocument.ImportPage(PdfReadDocument, int)"/>. Drawing on imported
+        /// pages is not supported yet.
+        /// </summary>
+        public bool IsImported => Imported != null;
+
+        /// <summary>True when any drawing, annotation, or form field has been recorded on this page.</summary>
+        internal bool HasGeneratedContent =>
+            _content.Length > 0 || _annotations.Count > 0 || _formFields.Count > 0;
+
         internal Dictionary<string, PdfFontSource> GetUsedFonts() => _usedFonts;
         internal Dictionary<string, PdfImage> GetUsedImages() => _usedImages;
         internal Dictionary<float, string> GetUsedGraphicsStates() => _usedGraphicsStates;
