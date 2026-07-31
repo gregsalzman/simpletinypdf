@@ -99,15 +99,15 @@ One of SimpleTinyPDF's goals is to stay tiny. Here's how it compares to other po
 
 | Library | NuGet Package | Total Footprint | vs SimpleTinyPDF | Native Binaries? |
 |---|---|---|---|---|
-| **SimpleTinyPDF** | **~259 KB** | **~259 KB** | **1x** | No |
-| **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 25x | No |
+| **SimpleTinyPDF** | **~262 KB** | **~262 KB** | **1x** | No |
+| **PDFsharp + MigraDoc** 6.2.4 | ~6.1 MB | ~6.2 MB | 24x | No |
 | **iText** 9.6.0 | ~5.0 MB | ~13–15 MB | 55x | No (BouncyCastle ~8 MB) |
-| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 143x | Yes (bundled Skia) |
-| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 990x | Yes (bundled Chromium) |
+| **QuestPDF** 2026.2.4 | ~36 MB | ~36 MB | 141x | Yes (bundled Skia) |
+| **IronPDF** 2026.5 | ~19 MB | ~250+ MB | 977x | Yes (bundled Chromium) |
 
 PDFsharp is shown with MigraDoc (its document-model layer) since most real-world usage relies on MigraDoc for tables, paragraphs, and auto-pagination — raw PDFsharp alone is ~4.4 MB. IronPDF's footprint includes the Chromium rendering engine downloaded at build/runtime. QuestPDF bundles custom Skia native binaries for cross-platform rendering.
 
-The v0.90 PDF reader/editor (parser, cross-reference handling, page importer) added about 31 KB to the assembly — the whole editing feature costs less than half of one percent of the next-smallest library's footprint.
+The v0.90 PDF reader/editor (parser, cross-reference handling, page importer) added about 31 KB to the assembly, and v0.92's stamping support (drawing, annotations, and form fields on imported pages) about 3 KB more — the whole editing feature costs less than half of one percent of the next-smallest library's footprint.
 
 ## Performance Comparison
 
