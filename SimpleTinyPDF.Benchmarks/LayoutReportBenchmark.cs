@@ -216,6 +216,110 @@ public class LayoutReportBenchmark
         return ms.ToArray();
     }
 
+#if INCLUDE_ITEXT
+    // ── iText ──────────────────────────────────────────────────
+
+    [Benchmark(Description = "iText")]
+    public byte[] IText()
+    {
+        using var ms = new MemoryStream();
+        var writer = new iText.Kernel.Pdf.PdfWriter(ms);
+        var pdf = new iText.Kernel.Pdf.PdfDocument(writer);
+        pdf.SetDefaultPageSize(iText.Kernel.Geom.PageSize.LETTER);
+        // immediateFlush: false keeps pages writable so the header/footer pass below
+        // can add "Page X of Y" once the total page count is known
+        var document = new iText.Layout.Document(pdf, iText.Kernel.Geom.PageSize.LETTER, false);
+        document.SetMargins(72, 72, 72, 72);
+
+        var boldFont = iText.Kernel.Font.PdfFontFactory.CreateFont(
+            iText.IO.Font.Constants.StandardFonts.HELVETICA_BOLD);
+        var normalFont = iText.Kernel.Font.PdfFontFactory.CreateFont(
+            iText.IO.Font.Constants.StandardFonts.HELVETICA);
+
+        var darkGray = new iText.Kernel.Colors.DeviceRgb(84, 84, 84);
+        var headerBg = new iText.Kernel.Colors.DeviceRgb(51, 51, 51);
+        var altBg = new iText.Kernel.Colors.DeviceRgb(242, 242, 242);
+        var lightGray = new iText.Kernel.Colors.DeviceRgb(212, 212, 212);
+
+        document.Add(new iText.Layout.Element.Paragraph("Quarterly Performance Report")
+            .SetFont(boldFont).SetFontSize(22)
+            .SetTextAlignment(iText.Layout.Properties.TextAlignment.CENTER)
+            .SetMarginBottom(20));
+
+        for (int i = 0; i < ParagraphCount; i++)
+        {
+            if (i % 5 == 0)
+                document.Add(new iText.Layout.Element.Paragraph($"Chapter {i / 5 + 1}: Analysis")
+                    .SetFont(boldFont).SetFontSize(16)
+                    .SetMarginTop(15).SetMarginBottom(8));
+            document.Add(new iText.Layout.Element.Paragraph(BodyText)
+                .SetFont(normalFont).SetFontSize(12).SetMarginBottom(6));
+        }
+
+        document.Add(new iText.Layout.Element.Paragraph("Financial Summary")
+            .SetFont(boldFont).SetFontSize(16)
+            .SetMarginTop(15).SetMarginBottom(8));
+
+        var table = new iText.Layout.Element.Table(
+            iText.Layout.Properties.UnitValue.CreatePointArray(new float[] { 150, 100, 100, 100 }));
+
+        foreach (var h in Headers)
+        {
+            table.AddHeaderCell(new iText.Layout.Element.Cell()
+                .Add(new iText.Layout.Element.Paragraph(h)
+                    .SetFont(boldFont).SetFontSize(12)
+                    .SetFontColor(iText.Kernel.Colors.ColorConstants.WHITE))
+                .SetBackgroundColor(headerBg).SetPadding(4));
+        }
+
+        for (int r = 0; r < TableRows.Length; r++)
+        {
+            bool alt = r % 2 == 1;
+            foreach (var cellText in TableRows[r])
+            {
+                var cell = new iText.Layout.Element.Cell()
+                    .Add(new iText.Layout.Element.Paragraph(cellText)
+                        .SetFont(normalFont).SetFontSize(12))
+                    .SetPadding(4);
+                if (alt) cell.SetBackgroundColor(altBg);
+                table.AddCell(cell);
+            }
+        }
+
+        document.Add(table);
+
+        // Header/footer with "Page X of Y": drawn after layout so the total page
+        // count is known — the equivalent of the two-pass rendering the other
+        // engines perform for their page-number fields
+        int totalPages = pdf.GetNumberOfPages();
+        for (int p = 1; p <= totalPages; p++)
+        {
+            var page = pdf.GetPage(p);
+            var ps = page.GetPageSize();
+            var pdfCanvas = new iText.Kernel.Pdf.Canvas.PdfCanvas(page);
+            pdfCanvas.SetStrokeColor(lightGray).SetLineWidth(0.5f)
+                .MoveTo(72, ps.GetTop() - 45).LineTo(ps.GetWidth() - 72, ps.GetTop() - 45).Stroke()
+                .MoveTo(72, 50).LineTo(ps.GetWidth() - 72, 50).Stroke();
+
+            var canvas = new iText.Layout.Canvas(pdfCanvas, ps);
+            canvas.ShowTextAligned(
+                new iText.Layout.Element.Paragraph("Quarterly Report — Acme Corp")
+                    .SetFont(boldFont).SetFontSize(9).SetFontColor(darkGray),
+                ps.GetWidth() / 2, ps.GetTop() - 39,
+                iText.Layout.Properties.TextAlignment.CENTER);
+            canvas.ShowTextAligned(
+                new iText.Layout.Element.Paragraph($"Page {p} of {totalPages}")
+                    .SetFont(normalFont).SetFontSize(8).SetFontColor(darkGray),
+                ps.GetWidth() / 2, 32,
+                iText.Layout.Properties.TextAlignment.CENTER);
+            canvas.Close();
+        }
+
+        document.Close();
+        return ms.ToArray();
+    }
+#endif
+
     // ── QuestPDF ───────────────────────────────────────────────
 
     [Benchmark(Description = "QuestPDF")]

@@ -111,38 +111,39 @@ The v0.90 PDF reader/editor (parser, cross-reference handling, page importer) ad
 
 ## Performance Comparison
 
-Benchmarked with [BenchmarkDotNet](https://benchmarkdotnet.org/) on Windows 11, Intel Core 7 150U (10 cores), .NET 9.0.18. All rows in all three tables come from a single benchmark session on an idle, freshly rebooted machine (July 2026, at v0.90). All output is generated in-memory (`byte[]`). IronPDF could not be benchmarked (requires a commercial license in Release builds). PDFsharp is benchmarked via MigraDoc (its document-model layer with tables, paragraphs, and auto-pagination) for a fair API-level comparison. Because iText is AGPL-licensed, it is not referenced by the benchmark project by default — its benchmarks are gated behind an opt-in MSBuild property (set the `IncludeIText=true` environment variable) so this MIT repo stays free of AGPL packages; the iText rows were measured in the same session with that flag enabled. See the [SimpleTinyPDF.Benchmarks](SimpleTinyPDF.Benchmarks/) project to run these yourself.
+Benchmarked with [BenchmarkDotNet](https://benchmarkdotnet.org/) on Windows 11, Intel Core 7 150U (10 cores), .NET 9.0.18. All rows in all three tables come from a single benchmark session (July 31, 2026, at v0.92). All output is generated in-memory (`byte[]`). IronPDF could not be benchmarked (requires a commercial license in Release builds). PDFsharp is benchmarked via MigraDoc (its document-model layer with tables, paragraphs, and auto-pagination) for a fair API-level comparison. Because iText is AGPL-licensed, it is not referenced by the benchmark project by default — its benchmarks are gated behind an opt-in MSBuild property (set the `IncludeIText=true` environment variable) so this MIT repo stays free of AGPL packages; the iText rows were measured in the same session with that flag enabled. See the [SimpleTinyPDF.Benchmarks](SimpleTinyPDF.Benchmarks/) project to run these yourself.
 
 **Scenario 1 — 10,000-row CSV table** (landscape, auto-paginated with header repeat and alternate row shading):
 
 | Library | Mean | Allocated | vs SimpleTinyPDF |
 |---|---|---|---|
-| **SimpleTinyPDF** | **183 ms** | **173 MB** | **1x** |
-| **PDFsharp + MigraDoc** 6.2.4 | 4,441 ms | 845 MB | 24x slower |
-| **iText** 9.6.0 | 7,849 ms | 1,986 MB | 43x slower |
-| **QuestPDF** 2026.5 | 1,342 ms | 284 MB | 7x slower |
+| **SimpleTinyPDF** | **161 ms** | **173 MB** | **1x** |
+| **PDFsharp + MigraDoc** 6.2.4 | 4,235 ms | 845 MB | 26x slower |
+| **iText** 9.6.0 | 5,852 ms | 1,986 MB | 36x slower |
+| **QuestPDF** 2026.5 | 1,179 ms | 284 MB | 7x slower |
 | **IronPDF** 2026.5 | N/A | N/A | — |
 
 **Scenario 2 — 1,000-invoice batch** (each invoice: header, details, 3-row line items table, totals, footer):
 
 | Library | Mean | Allocated | vs SimpleTinyPDF |
 |---|---|---|---|
-| **SimpleTinyPDF** | **114 ms** | **75 MB** | **1x** |
-| **PDFsharp + MigraDoc** 6.2.4 | 1,048 ms | 559 MB | 9x slower |
-| **iText** 9.6.0 | 2,768 ms | 1,062 MB | 24x slower |
-| **QuestPDF** 2026.5 | 1,011 ms | 224 MB | 9x slower |
+| **SimpleTinyPDF** | **87 ms** | **75 MB** | **1x** |
+| **PDFsharp + MigraDoc** 6.2.4 | 682 ms | 559 MB | 8x slower |
+| **iText** 9.6.0 | 2,632 ms | 1,062 MB | 30x slower |
+| **QuestPDF** 2026.5 | 927 ms | 224 MB | 11x slower |
 | **IronPDF** 2026.5 | N/A | N/A | — |
 
 **Scenario 3 — Multi-page flowing report** (50 paragraphs with chapter headings, headers/footers with page numbers, summary table; uses `PdfDocumentLayout` with sections, columns, and page events):
 
 | Library | Mean | Allocated | vs SimpleTinyPDF |
 |---|---|---|---|
-| **SimpleTinyPDF** (Layout) | **1.21 ms** | **1,785 KB** | **1x** |
-| **PDFsharp + MigraDoc** 6.2.4 | 13.13 ms | 19,466 KB | 11x slower |
-| **QuestPDF** 2026.5 | 19.00 ms | 838 KB | 16x slower |
+| **SimpleTinyPDF** (Layout) | **1.12 ms** | **1,785 KB** | **1x** |
+| **PDFsharp + MigraDoc** 6.2.4 | 12.10 ms | 19,465 KB | 11x slower |
+| **iText** 9.6.0 | 14.36 ms | 8,811 KB | 13x slower |
+| **QuestPDF** 2026.5 | 18.16 ms | 838 KB | 16x slower |
 | **IronPDF** 2026.5 | N/A | N/A | — |
 
-SimpleTinyPDF is the fastest library in all three scenarios. In the layout report benchmark (Scenario 3), SimpleTinyPDF's `PdfDocumentLayout` engine is 11x faster than MigraDoc and 16x faster than QuestPDF while using a fraction of the memory compared to MigraDoc. QuestPDF achieves lower memory allocation but is significantly slower. In the data-heavy scenarios (1 and 2), SimpleTinyPDF leads by 7–43x in speed with substantially lower memory allocation.
+SimpleTinyPDF is the fastest library in all three scenarios. In the layout report benchmark (Scenario 3), SimpleTinyPDF's `PdfDocumentLayout` engine is 11x faster than MigraDoc, 13x faster than iText, and 16x faster than QuestPDF while using a fraction of the memory compared to MigraDoc and iText. QuestPDF achieves lower memory allocation but is significantly slower. In the data-heavy scenarios (1 and 2), SimpleTinyPDF leads by 7–36x in speed with substantially lower memory allocation.
 
 
 ## API Reference
