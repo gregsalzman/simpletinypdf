@@ -749,13 +749,18 @@ namespace SimpleTinyPDF
                 catalog.Set("AcroForm", acroForm.Ref);
             }
 
-            // Generate file ID early (needed for encryption key derivation)
+            // Generate file ID early (needed for encryption key derivation).
+            // SHA-256 truncated to the customary 16 bytes: the spec suggests MD5 for /ID
+            // but any unique bytes are valid, and MD5 is unavailable on some platforms
+            // (e.g. Blazor WebAssembly) while SHA-256 works everywhere.
             byte[] idHash;
-            using (var md5 = MD5.Create())
+            using (var sha256 = SHA256.Create())
             {
                 var idSource = Encoding.ASCII.GetBytes(
                     DateTime.Now.ToString("o") + objects.Count);
-                idHash = md5.ComputeHash(idSource);
+                var fullHash = sha256.ComputeHash(idSource);
+                idHash = new byte[16];
+                Array.Copy(fullHash, idHash, 16);
             }
             var idHex = BitConverter.ToString(idHash).Replace("-", "");
 

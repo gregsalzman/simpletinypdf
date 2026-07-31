@@ -55,6 +55,7 @@ A small-but-mighty zero-dependency PDF generation library for .NET.  It is faste
 - **Coordinates** — top-down (default) or native PDF bottom-up
 - **Metadata** — document title and author
 - **Zero dependencies** — no NuGet packages, no native libraries
+- **Runs in Blazor WebAssembly** — pure managed code with no native binaries means PDFs can be generated, opened, and merged entirely in the browser; encryption and digital signatures remain server-only (the browser runtime lacks AES/RSA)
 
 ## Quick Start
 
@@ -82,7 +83,7 @@ See the full [Invoice example](#example-invoice-with-company-logo) and [CSV Tabl
 
 - Generate invoices, reports, receipts, or labels from code
 - Avoid pulling in a large dependency tree for simple PDF output
-- Run in constrained environments (Azure Functions, Docker, CI pipelines) without native libraries
+- Run in constrained environments (Azure Functions, Docker, CI pipelines, Blazor WebAssembly) without native libraries
 - Ship a self-contained app with no runtime font or image dependencies
 
 **Look elsewhere if you need:**
@@ -1744,6 +1745,7 @@ doc.Save("sales-report.pdf");
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.91 | July 28, 2026 | Add Blazor WebAssembly support: file /ID generation now uses SHA-256 (truncated to the customary 16 bytes) instead of MD5, which is unavailable on the browser runtime. Generating, opening, and merging PDFs verified end-to-end inside Blazor WASM; encryption and digital signatures remain server-only (browser runtime lacks AES/RSA). No API changes. |
 | 0.90 | July 16, 2026 | Add editing of existing PDFs: open any unencrypted PDF with `PdfReadDocument.Open`, then merge, split, extract, delete, rearrange, or insert pages via `ImportPage` / `ImportPages` / `RemovePage` / `MovePage` / `PdfDocument.Merge`. Imported pages mix freely with generated pages and preserve full appearance; resources shared between imported pages are deduplicated. Pure C# PDF parser supports classic xref tables, cross-reference streams, object streams, incremental updates, hybrid-reference files, and automatic repair of broken cross-reference data. Merged output can be encrypted and digitally signed. Saving is a full rewrite (source signatures are not carried over). |
 | 0.80 | July 12, 2026 | Add right-to-left text support for Arabic and Hebrew. Pure C# Unicode Bidirectional Algorithm (UAX #9, adapted from RichTextKit) resolves mixed RTL/LTR lines with correct digit ordering, bracket pairing, and mirroring; Arabic contextual shaping via Unicode presentation forms handles letter joining, lam-alef ligatures, tashkeel marks, and Persian/Urdu extended letters. Works automatically with logical-order input in single-line, wrapped, and justified text — no API changes, no new dependencies (~35 KB). |
 | 0.72 | July 3, 2026 | Add advanced layout controls: paragraph indentation (`LeftIndent`, `RightIndent`, `FirstLineIndent` with hanging indent support), `KeepTogether` / `KeepWithNext` pagination control, horizontal rules (`AddHorizontalRule`), single-pass lazy rendering for large documents (`LazyRendering`), and debug helpers (`DebugOptions`: margin/column guides, element bounds, layout warnings). |
