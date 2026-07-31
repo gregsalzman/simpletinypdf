@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Xunit;
 
@@ -214,6 +216,81 @@ namespace SimpleTinyPDF.Tests.Layout
             Assert.True(TestHelper.HasDarkPixelsInRegion(bmp2,
                 TestHelper.PtToPx(400), TestHelper.PtToPx(523),
                 footerY - 10, footerY + 15));
+        }
+
+        [Fact]
+        public void Footer_FiresOncePerPage_WhenTableSpansPages()
+        {
+            var layout = new PdfDocumentLayout();
+            var footerPages = new List<int>();
+            layout.HeaderFooter.Footer = (page, ctx) =>
+            {
+                // Pass 1 (page counting) runs with TotalPages = 0; record only
+                // the final pass so each page appears exactly once.
+                if (ctx.TotalPages > 0)
+                    footerPages.Add(ctx.PageNumber);
+                page.DrawText($"Page {ctx.PageNumber} of {ctx.TotalPages}",
+                    page.Width / 2, page.Height - 30,
+                    PdfFont.Helvetica, 10, PdfColor.Black, TextAlignment.Center);
+            };
+
+            layout.AddParagraph("Report with a long table:");
+            var table = new PdfTable(100, 100, 100);
+            table.SetHeaders("Col A", "Col B", "Col C");
+            for (int i = 0; i < 120; i++)
+                table.AddRow($"R{i}A", $"R{i}B", $"R{i}C");
+            layout.AddTable(table);
+
+            var doc = layout.Generate();
+            Assert.True(doc.PageCount >= 3, $"Expected at least 3 pages but got {doc.PageCount}");
+
+            // Exactly once per page, in order — no skipped first page,
+            // no doubled last page.
+            Assert.Equal(Enumerable.Range(1, doc.PageCount), footerPages);
+
+            foreach (var page in doc.Pages)
+                TestHelper.AddDescription(page, "Verify: every page has exactly one 'Page X of N' footer");
+            var bytes = doc.ToArray();
+            TestHelper.SavePdf(bytes, "Layout/header-footer-table-spans-pages");
+
+            // Footer must be visible on every page, including page 1
+            int midX = TestHelper.PtToPx(595f / 2f);
+            int footerY = TestHelper.PtToPx(842 - 30);
+            for (int i = 0; i < doc.PageCount; i++)
+            {
+                var bmp = TestHelper.RasterizePage(bytes, "Layout/header-footer-table-spans-pages", i);
+                Assert.True(TestHelper.HasDarkPixelsInRegion(bmp,
+                    midX - 50, midX + 50, footerY - 10, footerY + 15),
+                    $"Missing footer on page {i + 1}");
+            }
+        }
+
+        [Fact]
+        public void Footer_FiresOncePerPage_WhenListSpansPages()
+        {
+            var layout = new PdfDocumentLayout();
+            var footerPages = new List<int>();
+            layout.HeaderFooter.Footer = (page, ctx) =>
+            {
+                if (ctx.TotalPages > 0)
+                    footerPages.Add(ctx.PageNumber);
+                page.DrawText($"Page {ctx.PageNumber}", page.Width / 2, page.Height - 30,
+                    PdfFont.Helvetica, 10, PdfColor.Black, TextAlignment.Center);
+            };
+
+            var items = new ListItem[120];
+            for (int i = 0; i < items.Length; i++)
+                items[i] = new ListItem($"Item number {i + 1} with enough text to take up space");
+            layout.AddList(items, ListStyle.Numbered);
+
+            var doc = layout.Generate();
+            Assert.True(doc.PageCount >= 3, $"Expected at least 3 pages but got {doc.PageCount}");
+            Assert.Equal(Enumerable.Range(1, doc.PageCount), footerPages);
+
+            foreach (var page in doc.Pages)
+                TestHelper.AddDescription(page, "Verify: every page has exactly one 'Page X' footer");
+            var bytes = doc.ToArray();
+            TestHelper.SavePdf(bytes, "Layout/header-footer-list-spans-pages");
         }
 
         [Fact]

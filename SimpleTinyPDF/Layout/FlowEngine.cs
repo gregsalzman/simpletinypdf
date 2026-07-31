@@ -1137,7 +1137,6 @@ namespace SimpleTinyPDF
             }
 
             int pagesBefore = _doc.PageCount;
-            int pageNumBefore = _pageNumber;
 
             _currentY = _currentPage.DrawTable(element.Table, _contentLeft, _currentY,
                 _margins.Bottom, _margins.Top);
@@ -1145,14 +1144,20 @@ namespace SimpleTinyPDF
             int pagesAfter = _doc.PageCount;
             if (pagesAfter > pagesBefore)
             {
-                // Table created continuation pages — apply headers/footers
+                // Table created continuation pages. A page's footer is drawn when
+                // the page ends: the start page ends here, and so does each
+                // continuation page except the last, which stays current and gets
+                // its footer at the next page break or end of render.
+                DrawFooterOnCurrentPage();
+
                 for (int i = pagesBefore; i < pagesAfter; i++)
                 {
                     _pageNumber++;
                     _sectionPageNumber++;
                     var page = _doc.Pages[i];
                     DrawHeaderOnPage(page, _pageNumber);
-                    DrawFooterOnPage(page, _pageNumber);
+                    if (i < pagesAfter - 1)
+                        DrawFooterOnPage(page, _pageNumber);
                 }
 
                 _currentPage = _doc.Pages[pagesAfter - 1];
@@ -1175,13 +1180,19 @@ namespace SimpleTinyPDF
             int pagesAfter = _doc.PageCount;
             if (pagesAfter > pagesBefore)
             {
+                // Same deferred-footer rule as RenderTable: the start page and
+                // intermediate continuation pages end here; the last page's
+                // footer is drawn when it ends.
+                DrawFooterOnCurrentPage();
+
                 for (int i = pagesBefore; i < pagesAfter; i++)
                 {
                     _pageNumber++;
                     _sectionPageNumber++;
                     var page = _doc.Pages[i];
                     DrawHeaderOnPage(page, _pageNumber);
-                    DrawFooterOnPage(page, _pageNumber);
+                    if (i < pagesAfter - 1)
+                        DrawFooterOnPage(page, _pageNumber);
                 }
 
                 _currentPage = resultPage;
