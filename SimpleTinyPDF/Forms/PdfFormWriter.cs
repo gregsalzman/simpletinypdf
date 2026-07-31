@@ -6,7 +6,7 @@ namespace SimpleTinyPDF
 {
     internal static partial class PdfWriter
     {
-        private static PdfDict CreateFormWidget(FormField field, PdfDict pageDict,
+        private static PdfDict CreateFormWidget(FormField field, PdfObj pageDict,
             List<PdfObj> objects, Func<PdfObj, PdfObj> addObj,
             List<string> drFontParts, HashSet<string> drFontNames,
             bool isRadioChild, ref PdfDict formFontObj)
@@ -203,6 +203,26 @@ namespace SimpleTinyPDF
                 sb.Append(PdfStringHelper.Escape(item)).Append(' ');
             sb.Append(']');
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Appends an annotation to a page's /Annots, dispatching on the page's kind:
+        /// generated pages hold a serialized array; imported pages get a writer-side
+        /// reference injected into their parsed /Annots array.
+        /// </summary>
+        private static void AppendAnnotToPage(PdfObj pageObj, PdfDict annotDict)
+        {
+            if (pageObj is ImportedObj imported && imported.Body is CosDict body)
+            {
+                if (!(body.Get("Annots") is CosArray annots))
+                {
+                    annots = new CosArray();
+                    body.Set("Annots", annots);
+                }
+                annots.Items.Add(new CosWriterRef(annotDict));
+                return;
+            }
+            AppendAnnotToPage((PdfDict)pageObj, annotDict);
         }
 
         private static void AppendAnnotToPage(PdfDict pageDict, PdfDict annotDict)

@@ -118,7 +118,8 @@ namespace SimpleTinyPDF
         /// </summary>
         /// <param name="source">The opened source PDF.</param>
         /// <param name="pageNumber">The 1-based page number in the source.</param>
-        /// <returns>The imported page. Drawing on it is not supported yet.</returns>
+        /// <returns>The imported page. Drawing on it stamps new content on top of the
+        /// existing page content.</returns>
         public PdfPage ImportPage(PdfReadDocument source, int pageNumber) =>
             ImportPage(source, pageNumber, _pages.Count + 1);
 
@@ -128,7 +129,8 @@ namespace SimpleTinyPDF
         /// <param name="source">The opened source PDF.</param>
         /// <param name="pageNumber">The 1-based page number in the source.</param>
         /// <param name="insertAt">The 1-based position in this document (1 inserts at the beginning).</param>
-        /// <returns>The imported page. Drawing on it is not supported yet.</returns>
+        /// <returns>The imported page. Drawing on it stamps new content on top of the
+        /// existing page content.</returns>
         public PdfPage ImportPage(PdfReadDocument source, int pageNumber, int insertAt)
         {
             if (source == null)
@@ -144,8 +146,17 @@ namespace SimpleTinyPDF
                 _importContexts[source] = context;
             }
             var content = PageImporter.Import(context, pageNumber);
-            var size = source.GetPageSize(pageNumber);
-            var page = new PdfPage(content, size.Width, size.Height);
+            // Page dimensions are the VIEWED size: swapped for /Rotate 90 and 270, so
+            // drawing coordinates match what the user sees in a viewer.
+            float width = content.BoxX1 - content.BoxX0;
+            float height = content.BoxY1 - content.BoxY0;
+            if (content.Rotate == 90 || content.Rotate == 270)
+            {
+                float t = width;
+                width = height;
+                height = t;
+            }
+            var page = new PdfPage(content, width, height);
             page.Document = this;
             _pages.Insert(insertAt - 1, page);
             return page;

@@ -316,22 +316,6 @@ namespace SimpleTinyPDF.Tests
             }
         }
 
-        // ── Guards ──────────────────────────────────────────────────
-
-        [Fact]
-        public void DrawingOnImportedPage_ThrowsAtSave()
-        {
-            var sourceBytes = MakeSourceDocument();
-            using (var source = PdfReadDocument.Open(sourceBytes))
-            {
-                var dest = new PdfDocument();
-                var imported = dest.ImportPage(source, 1);
-                imported.DrawText("Stamp attempt", 50, 50, PdfFont.Helvetica, 12);
-
-                Assert.Throws<InvalidOperationException>(() => dest.ToArray());
-            }
-        }
-
         [Fact]
         public void ImportPage_LinkAnnotationSurvives_WidgetsAndDestsDropped()
         {

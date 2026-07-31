@@ -129,26 +129,75 @@ namespace SimpleTinyPDF
                     }
                 }
                 // The page body is always cloned: it may be mutated during this save
-                // (signature widget injection, encryption) and must stay reusable
-                var pageBody = CosCloner.Clone(content.PageDict);
+                // (stamping, signature widget injection, encryption) and must stay reusable
+                var pageBody = (CosDict)CosCloner.Clone(content.PageDict);
+                if (page.HasDrawnContent)
+                    StampDrawnContent(page, pageBody);
                 var pageObj = new ImportedObj { Body = pageBody, RefMap = refMap, ParentTarget = pagesNode };
                 AddObj(pageObj);
                 pageObjRefs.Add(pageObj.Ref);
                 pageDicts[page] = pageObj;
             }
 
-            foreach (var page in doc.Pages)
+            // Stamps a page's drawn content on top of an imported page. The new operators
+            // live in a Form XObject with its own /Resources, so generated resource names
+            // (F1, Img1, ...) can never collide with the imported page's names. The original
+            // content is wrapped in q...Q to isolate any graphics state it leaves behind.
+            void StampDrawnContent(PdfPage page, CosDict pageBody)
             {
-                if (page.IsImported)
-                {
-                    if (page.HasGeneratedContent)
-                        throw new InvalidOperationException(
-                            "Drawing or adding annotations/form fields on an imported page is not supported yet. " +
-                            "Draw on a new page instead.");
-                    EmitImportedPage(page);
-                    continue;
-                }
+                var content = page.Imported;
 
+                var form = new PdfStream();
+                form.Set("Type", "/XObject");
+                form.Set("Subtype", "/Form");
+                form.Set("BBox", $"[0 0 {PdfStringHelper.F(page.Width)} {PdfStringHelper.F(page.Height)}]");
+                form.Set("Resources", BuildGeneratedResources(page));
+                form.Data = Encoding.ASCII.GetBytes(page.GetContentStream());
+                AddObj(form);
+
+                string stampName = AddStampToResources(pageBody, content.Context, form);
+
+                var transform = StampTransform.For(content);
+                var invoke = new StringBuilder("\nQ\nq\n");
+                if (!transform.IsIdentity)
+                {
+                    invoke.Append(PdfStringHelper.F(transform.A)).Append(' ')
+                        .Append(PdfStringHelper.F(transform.B)).Append(' ')
+                        .Append(PdfStringHelper.F(transform.C)).Append(' ')
+                        .Append(PdfStringHelper.F(transform.D)).Append(' ')
+                        .Append(PdfStringHelper.F(transform.E)).Append(' ')
+                        .Append(PdfStringHelper.F(transform.F)).Append(" cm\n");
+                }
+                invoke.Append('/').Append(stampName).Append(" Do\nQ\n");
+
+                var prepend = new PdfStream { Data = Encoding.ASCII.GetBytes("q\n") };
+                AddObj(prepend);
+                var append = new PdfStream { Data = Encoding.ASCII.GetBytes(invoke.ToString()) };
+                AddObj(append);
+
+                // /Contents may be a stream, an array of streams, or an indirect reference
+                // to either. A reference to an array must be spliced element-wise: nesting
+                // it inside the new array would be illegal and viewers drop the content.
+                var newContents = new CosArray();
+                newContents.Items.Add(new CosWriterRef(prepend));
+                var existing = pageBody.Get("Contents");
+                var resolved = existing is CosReference contentsRef
+                    && content.Context.ClonedObjects.TryGetValue(contentsRef.Id, out var target)
+                    ? target
+                    : existing;
+                if (resolved is CosArray existingArray)
+                    newContents.Items.AddRange(existingArray.Items);
+                else if (existing != null && !(existing is CosNull))
+                    newContents.Items.Add(existing);
+                newContents.Items.Add(new CosWriterRef(append));
+                pageBody.Set("Contents", newContents);
+            }
+
+            // Builds the /Resources dictionary for a page's generated (drawn) content,
+            // emitting font/gs/colorspace objects as needed. Shared by regular pages and
+            // the stamp Form XObject on imported pages.
+            string BuildGeneratedResources(PdfPage page)
+            {
                 // Font objects for this page
                 var usedFonts = page.GetUsedFonts();
                 var fontRefParts = new List<string>();
@@ -294,11 +343,6 @@ namespace SimpleTinyPDF
                     csRefParts.Add($"/{csId} {csArrayObj.Ref}");
                 }
 
-                // Content stream
-                var contentStream = new PdfStream();
-                contentStream.Data = Encoding.ASCII.GetBytes(page.GetContentStream());
-                AddObj(contentStream);
-
                 // Build resources dictionary inline
                 var resources = new StringBuilder("<< ");
                 if (fontRefParts.Count > 0)
@@ -337,6 +381,23 @@ namespace SimpleTinyPDF
                     resources.Append(">> ");
                 }
                 resources.Append(">>");
+                return resources.ToString();
+            }
+
+            foreach (var page in doc.Pages)
+            {
+                if (page.IsImported)
+                {
+                    EmitImportedPage(page);
+                    continue;
+                }
+
+                var pageResources = BuildGeneratedResources(page);
+
+                // Content stream
+                var contentStream = new PdfStream();
+                contentStream.Data = Encoding.ASCII.GetBytes(page.GetContentStream());
+                AddObj(contentStream);
 
                 // Page dictionary (created before annotations so all page refs are available)
                 var pageDict = new PdfDict();
@@ -344,7 +405,7 @@ namespace SimpleTinyPDF
                 pageDict.Set("Parent", pagesNode.Ref);
                 pageDict.Set("MediaBox", $"[0 0 {PdfStringHelper.F(page.Width)} {PdfStringHelper.F(page.Height)}]");
                 pageDict.Set("Contents", contentStream.Ref);
-                pageDict.Set("Resources", resources.ToString());
+                pageDict.Set("Resources", pageResources);
                 AddObj(pageDict);
                 pageObjRefs.Add(pageDict.Ref);
                 pageDicts[page] = pageDict;
@@ -379,12 +440,15 @@ namespace SimpleTinyPDF
                 if (annotations.Count > 0)
                 {
                     var annotRefs = new List<string>();
+                    var pageTransform = page.IsImported
+                        ? StampTransform.For(page.Imported)
+                        : StampTransform.Identity;
                     foreach (var annot in annotations)
                     {
                         var annotDict = new PdfDict();
                         annotDict.Set("Type", "/Annot");
-                        var rect = $"[{PdfStringHelper.F(annot.X0)} {PdfStringHelper.F(annot.Y0)} {PdfStringHelper.F(annot.X1)} {PdfStringHelper.F(annot.Y1)}]";
-                        annotDict.Set("Rect", rect);
+                        annotDict.Set("Rect",
+                            FormatAnnotRect(pageTransform, annot.X0, annot.Y0, annot.X1, annot.Y1));
 
                         switch (annot.Kind)
                         {
@@ -411,6 +475,12 @@ namespace SimpleTinyPDF
                                 if (annot.QuadPoints != null)
                                 {
                                     var qp = annot.QuadPoints;
+                                    if (!pageTransform.IsIdentity)
+                                    {
+                                        qp = (float[])qp.Clone();
+                                        for (int q = 0; q < qp.Length; q += 2)
+                                            pageTransform.Apply(qp[q], qp[q + 1], out qp[q], out qp[q + 1]);
+                                    }
                                     annotDict.Set("QuadPoints",
                                         $"[{PdfStringHelper.F(qp[0])} {PdfStringHelper.F(qp[1])} {PdfStringHelper.F(qp[2])} {PdfStringHelper.F(qp[3])} " +
                                         $"{PdfStringHelper.F(qp[4])} {PdfStringHelper.F(qp[5])} {PdfStringHelper.F(qp[6])} {PdfStringHelper.F(qp[7])}]");
@@ -441,11 +511,8 @@ namespace SimpleTinyPDF
                                 {
                                     if (annot.TargetY.HasValue)
                                     {
-                                        float pdfTargetY = annot.TargetPage.CoordinateOrigin == CoordinateOrigin.TopDown
-                                            ? annot.TargetPage.Height - annot.TargetY.Value
-                                            : annot.TargetY.Value;
                                         annotDict.Set("Dest",
-                                            $"[{targetPageDict.Ref} /XYZ 0 {PdfStringHelper.F(pdfTargetY)} 0]");
+                                            FormatDestXyz(annot.TargetPage, targetPageDict, annot.TargetY.Value));
                                     }
                                     else
                                     {
@@ -457,8 +524,14 @@ namespace SimpleTinyPDF
 
                         AddObj(annotDict);
                         annotRefs.Add(annotDict.Ref);
+
+                        if (pageDicts[page] is ImportedObj)
+                            AppendAnnotToPage(pageDicts[page], annotDict);
                     }
-                    ((PdfDict)pageDicts[page]).Set("Annots", "[" + string.Join(" ", annotRefs) + "]");
+                    // Imported pages may carry annotations of their own, appended above;
+                    // generated pages get a fresh /Annots array.
+                    if (pageDicts[page] is PdfDict generatedPageDict)
+                        generatedPageDict.Set("Annots", "[" + string.Join(" ", annotRefs) + "]");
                 }
             }
 
@@ -493,17 +566,9 @@ namespace SimpleTinyPDF
                         if (pageDicts.TryGetValue(bm.Page, out var pageRef))
                         {
                             if (bm.Y.HasValue)
-                            {
-                                float pdfY = bm.Page.CoordinateOrigin == CoordinateOrigin.TopDown
-                                    ? bm.Page.Height - bm.Y.Value
-                                    : bm.Y.Value;
-                                dict.Set("Dest",
-                                    $"[{pageRef.Ref} /XYZ 0 {PdfStringHelper.F(pdfY)} 0]");
-                            }
+                                dict.Set("Dest", FormatDestXyz(bm.Page, pageRef, bm.Y.Value));
                             else
-                            {
                                 dict.Set("Dest", $"[{pageRef.Ref} /Fit]");
-                            }
                         }
 
                         if (bm.Children.Count > 0)
@@ -565,18 +630,20 @@ namespace SimpleTinyPDF
                         if (!radioGroups.ContainsKey(field.RadioGroup))
                             radioGroups[field.RadioGroup] = new List<(FormField, PdfDict)>();
 
-                        var rbWidget = CreateFormWidget(field, (PdfDict)pageDicts[page], objects, AddObj,
+                        var rbWidget = CreateFormWidget(field, pageDicts[page], objects, AddObj,
                             drFontParts, drFontNames, isRadioChild: true, ref formFontObj);
+                        AdjustWidgetForImportedPage(rbWidget, field, page);
                         radioGroups[field.RadioGroup].Add((field, rbWidget));
                         continue;
                     }
 
-                    var widget = CreateFormWidget(field, (PdfDict)pageDicts[page], objects, AddObj,
+                    var widget = CreateFormWidget(field, pageDicts[page], objects, AddObj,
                         drFontParts, drFontNames, isRadioChild: false, ref formFontObj);
+                    AdjustWidgetForImportedPage(widget, field, page);
                     fieldRefs.Add(widget.Ref);
 
                     // Add widget to page annots
-                    AppendAnnotToPage((PdfDict)pageDicts[page], widget);
+                    AppendAnnotToPage(pageDicts[page], widget);
                 }
 
                 // Process radio groups
@@ -606,7 +673,7 @@ namespace SimpleTinyPDF
                     {
                         widget.Set("Parent", parentField.Ref);
                         kidsRefs.Add(widget.Ref);
-                        AppendAnnotToPage((PdfDict)pageDicts[page], widget);
+                        AppendAnnotToPage(pageDicts[page], widget);
                     }
                     parentField.Set("Kids", "[" + string.Join(" ", kidsRefs) + "]");
                     fieldRefs.Add(parentField.Ref);
@@ -666,7 +733,10 @@ namespace SimpleTinyPDF
                         : sigOpts.Y;
                     float sx2 = sx + sigOpts.Width;
                     float sy2 = sy + sigOpts.Height;
-                    sigField.Set("Rect", $"[{PdfStringHelper.F(sx)} {PdfStringHelper.F(sy)} {PdfStringHelper.F(sx2)} {PdfStringHelper.F(sy2)}]");
+                    var sigTransform = sigPage.IsImported
+                        ? StampTransform.For(sigPage.Imported)
+                        : StampTransform.Identity;
+                    sigField.Set("Rect", FormatAnnotRect(sigTransform, sx, sy, sx2, sy2));
 
                     // Build appearance Form XObject
                     var apContent = FormAppearanceBuilder.BuildSignatureAppearance(
@@ -701,22 +771,7 @@ namespace SimpleTinyPDF
                 fieldRefs.Add(sigField.Ref);
 
                 if (sigPageDict != null)
-                {
-                    if (sigPageDict is PdfDict sigPageDictTyped)
-                    {
-                        AppendAnnotToPage(sigPageDictTyped, sigField);
-                    }
-                    else if (sigPageDict is ImportedObj importedPage && importedPage.Body is CosDict importedBody)
-                    {
-                        var annots = importedBody.Get("Annots") as CosArray;
-                        if (annots == null)
-                        {
-                            annots = new CosArray();
-                            importedBody.Set("Annots", annots);
-                        }
-                        annots.Items.Add(new CosWriterRef(sigField));
-                    }
-                }
+                    AppendAnnotToPage(sigPageDict, sigField);
 
                 // Ensure Helvetica is in DR for signature appearance
                 if (!drFontNames.Contains("Helvetica"))
@@ -882,6 +937,124 @@ namespace SimpleTinyPDF
                     doc.Signature);
                 output.Write(pdfBytes, 0, pdfBytes.Length);
             }
+        }
+
+        /// <summary>
+        /// Formats an annotation /Rect, mapping the corners through the page's stamp
+        /// transform so rectangles land correctly on imported pages with a non-zero
+        /// MediaBox origin or /Rotate value.
+        /// </summary>
+        private static string FormatAnnotRect(StampTransform transform,
+            float x0, float y0, float x1, float y1)
+        {
+            if (!transform.IsIdentity)
+            {
+                transform.Apply(x0, y0, out float ax, out float ay);
+                transform.Apply(x1, y1, out float bx, out float by);
+                x0 = Math.Min(ax, bx);
+                y0 = Math.Min(ay, by);
+                x1 = Math.Max(ax, bx);
+                y1 = Math.Max(ay, by);
+            }
+            return $"[{PdfStringHelper.F(x0)} {PdfStringHelper.F(y0)} " +
+                $"{PdfStringHelper.F(x1)} {PdfStringHelper.F(y1)}]";
+        }
+
+        /// <summary>
+        /// Formats an /XYZ destination for a bookmark or internal link, converting the
+        /// user-space Y to PDF space and through the target page's stamp transform when
+        /// the target is an imported page.
+        /// </summary>
+        private static string FormatDestXyz(PdfPage targetPage, PdfObj targetPageObj, float userY)
+        {
+            float pdfY = targetPage.CoordinateOrigin == CoordinateOrigin.TopDown
+                ? targetPage.Height - userY
+                : userY;
+            float x = 0;
+            if (targetPage.IsImported)
+            {
+                var transform = StampTransform.For(targetPage.Imported);
+                transform.Apply(0, pdfY, out x, out pdfY);
+            }
+            return $"[{targetPageObj.Ref} /XYZ {PdfStringHelper.F(x)} {PdfStringHelper.F(pdfY)} 0]";
+        }
+
+        /// <summary>
+        /// Repositions a form-field widget placed on an imported page with a non-zero
+        /// MediaBox origin or /Rotate: maps the rectangle through the stamp transform and
+        /// sets /MK /R so viewers rotate the appearance to match the page rotation.
+        /// </summary>
+        private static void AdjustWidgetForImportedPage(PdfDict widget, FormField field, PdfPage page)
+        {
+            if (!page.IsImported)
+                return;
+            var transform = StampTransform.For(page.Imported);
+            if (transform.IsIdentity)
+                return;
+            widget.Set("Rect", FormatAnnotRect(transform,
+                field.X, field.Y, field.X + field.Width, field.Y + field.Height));
+            if (page.Imported.Rotate != 0)
+                widget.Set("MK", $"<< /R {page.Imported.Rotate} >>");
+        }
+
+        /// <summary>
+        /// Registers the stamp Form XObject in an imported page's /Resources under a name
+        /// not used by the page, and returns that name. /Resources (or its /XObject entry)
+        /// may be an indirect reference to a dictionary shared by several pages; in that
+        /// case it is replaced with a private inline copy before the entry is added.
+        /// </summary>
+        private static string AddStampToResources(CosDict pageBody, ImportContext context, PdfStream form)
+        {
+            CosValue Resolve(CosValue v) =>
+                v is CosReference r && context.ClonedObjects.TryGetValue(r.Id, out var target) ? target : v;
+
+            // An inline /Resources belongs to the (deep-cloned) page body and is safe to
+            // mutate; a referenced one is shared with other pages and saves, so its entries
+            // are copied into a private inline dict. When /Resources itself was shared, its
+            // inline /XObject value is shared too and must also be copied.
+            var resourcesValue = pageBody.Get("Resources");
+            bool resourcesPrivate = resourcesValue is CosDict;
+            CosDict resources;
+            if (resourcesPrivate)
+            {
+                resources = (CosDict)resourcesValue;
+            }
+            else
+            {
+                resources = new CosDict();
+                if (Resolve(resourcesValue) is CosDict sharedResources)
+                {
+                    // Deep-clone so the encryption pass over the page body can never
+                    // touch values still shared with the import closure
+                    foreach (var kv in sharedResources.Entries)
+                        resources.Set(kv.Key, CosCloner.Clone(kv.Value));
+                }
+                pageBody.Set("Resources", resources);
+            }
+
+            var xobjectsValue = resources.Get("XObject");
+            CosDict xobjects;
+            if (resourcesPrivate && xobjectsValue is CosDict privateXObjects)
+            {
+                xobjects = privateXObjects;
+            }
+            else
+            {
+                xobjects = new CosDict();
+                if (Resolve(xobjectsValue) is CosDict sharedXObjects)
+                {
+                    foreach (var kv in sharedXObjects.Entries)
+                        xobjects.Set(kv.Key, CosCloner.Clone(kv.Value));
+                }
+                resources.Set("XObject", xobjects);
+            }
+
+            int n = 1;
+            while (xobjects.ContainsKey("Stamp" + n))
+                n++;
+            string name = "Stamp" + n;
+            xobjects.Set(name, new CosWriterRef(form));
+            return name;
         }
 
         private static string EscapeSpotName(string name)

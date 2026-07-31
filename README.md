@@ -47,7 +47,7 @@ A small-but-mighty zero-dependency PDF generation library for .NET.  It is faste
 - **Encryption** — AES-128 and AES-256 password protection with configurable user/owner passwords and granular permission flags (print, copy, modify, annotate, etc.)
 - **Form Fields (AcroForms)** — text fields (single/multi-line, password), checkboxes, radio buttons, dropdowns (combo boxes), listboxes (single/multi-select), and push buttons; editable in Adobe Acrobat and other PDF viewers
 - **Digital Signatures** — PKCS#7 detached signatures with X.509 certificates; visible or invisible; optional RFC 3161 timestamping from built-in or custom TSA servers; HSM/smart card/cloud KMS support via custom signer delegate
-- **Editing existing PDFs** — open any unencrypted PDF (including files with cross-reference streams and object streams) and merge, split, extract, delete, rearrange, or insert pages; mix imported pages with generated ones; encrypt or sign the result; automatic repair of files with broken cross-reference tables
+- **Editing existing PDFs** — open any unencrypted PDF (including files with cross-reference streams and object streams) and merge, split, extract, delete, rearrange, or insert pages; draw on imported pages (stamping/watermarking) with the full drawing API and add annotations or form fields to them; mix imported pages with generated ones; encrypt or sign the result; automatic repair of files with broken cross-reference tables
 - **Fonts** — 14 standard PDF Type 1 fonts (Helvetica, Times, Courier, Symbol, ZapfDingbats) plus TrueType (.ttf) and OpenType (.otf) font embedding with full Unicode support including supplementary planes (CJK, Cyrillic, Greek, Arabic, CJK Extension B, enclosed alphanumerics, etc.). TrueType fonts are automatically subsetted to include only the glyphs used in the document
 - **Colors** — RGB, CMYK, grayscale, and spot colors (Separation) with CMYK fallback and tint control
 - **Unit conversion** — convert between points, inches, centimeters, and millimeters; fractional inch support ("1-1/8", "1 1/8", "3/4")
@@ -90,7 +90,7 @@ See the full [Invoice example](#example-invoice-with-company-logo) and [CSV Tabl
 
 - HTML-to-PDF conversion
 - Full OpenType shaping — font-specific ligatures, precise diacritic positioning, or Nastaliq-style Urdu (standard Arabic and Hebrew are supported; see [Right-to-Left Text](#right-to-left-text-arabic-hebrew))
-- Content-level editing of existing PDFs — changing text, replacing images, or stamping onto existing pages (page-level operations — merge, split, extract, delete, rearrange — are supported; see [Editing Existing PDFs](#editing-existing-pdfs))
+- Content-level editing of existing PDFs — changing or removing text and images that are already in the file (page-level operations — merge, split, extract, delete, rearrange — and drawing *on top* of existing pages are supported; see [Editing Existing PDFs](#editing-existing-pdfs))
 - Extracting text or images from existing PDFs
 
 ## Size Comparison
@@ -1141,6 +1141,20 @@ using (var source = PdfReadDocument.Open("input.pdf"))
     doc.MovePage(3, 1);     // move page 3 to the front
     doc.Save("rearranged.pdf");
 }
+
+// Stamp / watermark existing pages: imported pages accept the full drawing API.
+// New content is drawn on top of the original page content.
+using (var source = PdfReadDocument.Open("contract.pdf"))
+{
+    var doc = new PdfDocument();
+    foreach (var page in doc.ImportPages(source, 1, source.PageCount))
+    {
+        page.DrawText("CONFIDENTIAL", 150, 400, PdfFont.HelveticaBold, 60,
+            PdfColor.Rgb(255, 0, 0), opacity: 0.3f);
+        page.DrawText($"Page {doc.GetPageNumber(page)}", 500, 810, PdfFont.Helvetica, 10);
+    }
+    doc.Save("contract-stamped.pdf");
+}
 ```
 
 **`PdfReadDocument`**
@@ -1173,8 +1187,9 @@ Notes and current limitations:
 - Reads classic cross-reference tables, cross-reference streams, object streams (PDF 1.5+), incremental updates, and hybrid-reference files. Files with a damaged cross-reference table are repaired automatically by scanning when possible.
 - PDF/X identity is preserved: the source's `/OutputIntents` (e.g. `GTS_PDFX`) and XMP metadata are carried onto the output catalog, so viewers like Acrobat keep simulating overprint for imported prepress content. When merging multiple sources, the first source that provides them wins.
 - Form-field widgets and in-document navigation (bookmarks, GoTo links) are not copied from source files; URI links, text notes, markup, and stamps on imported pages are preserved.
+- **Drawing on imported pages works like on any other page**: the full drawing API (text, shapes, images, barcodes, tables), annotations, and form fields are available. New content is stamped on top of the original page content and can never clash with the page's own fonts or images (it is isolated in its own resource scope). Pages with a rotated orientation (`/Rotate`) or a non-zero MediaBox origin are handled transparently — `page.Width`/`page.Height` report the page as viewed, and coordinates place content where you see it in a viewer.
+- Editing content already in the file (changing existing text, removing existing images) is not supported.
 - Password-protected source files are not supported yet (`Open` throws `NotSupportedException`).
-- Drawing on an imported page (stamping/watermarking) is not supported yet — saving such a document throws `InvalidOperationException`.
 
 ### Document Layout
 
@@ -1745,6 +1760,7 @@ doc.Save("sales-report.pdf");
 
 | Version | Date | Changes |
 |---|---|---|
+| 0.92 | July 31, 2026 | Add stamping/watermarking of imported pages: pages imported from an existing PDF now accept the full drawing API (text, shapes, images, barcodes, tables), annotations, and form fields. New content is drawn on top of the original page content inside an isolated Form XObject, so generated resource names can never collide with the source page's fonts or images. Pages with `/Rotate` or a non-zero MediaBox origin are compensated automatically — coordinates and `page.Width`/`Height` reflect the page as viewed. Works with encryption and digital signatures. |
 | 0.91 | July 28, 2026 | Add Blazor WebAssembly support: file /ID generation now uses SHA-256 (truncated to the customary 16 bytes) instead of MD5, which is unavailable on the browser runtime. Generating, opening, and merging PDFs verified end-to-end inside Blazor WASM; encryption and digital signatures remain server-only (browser runtime lacks AES/RSA). No API changes. |
 | 0.90 | July 16, 2026 | Add editing of existing PDFs: open any unencrypted PDF with `PdfReadDocument.Open`, then merge, split, extract, delete, rearrange, or insert pages via `ImportPage` / `ImportPages` / `RemovePage` / `MovePage` / `PdfDocument.Merge`. Imported pages mix freely with generated pages and preserve full appearance; resources shared between imported pages are deduplicated. Pure C# PDF parser supports classic xref tables, cross-reference streams, object streams, incremental updates, hybrid-reference files, and automatic repair of broken cross-reference data. Merged output can be encrypted and digitally signed. Saving is a full rewrite (source signatures are not carried over). |
 | 0.80 | July 12, 2026 | Add right-to-left text support for Arabic and Hebrew. Pure C# Unicode Bidirectional Algorithm (UAX #9, adapted from RichTextKit) resolves mixed RTL/LTR lines with correct digit ordering, bracket pairing, and mirroring; Arabic contextual shaping via Unicode presentation forms handles letter joining, lam-alef ligatures, tashkeel marks, and Persian/Urdu extended letters. Works automatically with logical-order input in single-line, wrapped, and justified text — no API changes, no new dependencies (~35 KB). |

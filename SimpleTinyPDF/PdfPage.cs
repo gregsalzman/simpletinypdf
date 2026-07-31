@@ -56,14 +56,13 @@ namespace SimpleTinyPDF
 
         /// <summary>
         /// True when this page was imported from an existing PDF via
-        /// <see cref="PdfDocument.ImportPage(PdfReadDocument, int)"/>. Drawing on imported
-        /// pages is not supported yet.
+        /// <see cref="PdfDocument.ImportPage(PdfReadDocument, int)"/>. Drawing on an
+        /// imported page stamps the new content on top of the existing page content.
         /// </summary>
         public bool IsImported => Imported != null;
 
-        /// <summary>True when any drawing, annotation, or form field has been recorded on this page.</summary>
-        internal bool HasGeneratedContent =>
-            _content.Length > 0 || _annotations.Count > 0 || _formFields.Count > 0;
+        /// <summary>True when any drawing operation has been recorded on this page.</summary>
+        internal bool HasDrawnContent => _content.Length > 0;
 
         internal Dictionary<string, PdfFontSource> GetUsedFonts() => _usedFonts;
         internal Dictionary<string, PdfImage> GetUsedImages() => _usedImages;

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace SimpleTinyPDF
@@ -35,6 +36,48 @@ namespace SimpleTinyPDF
         internal ImportContext Context;
         internal CosDict PageDict;
         internal PdfObjectId SourcePageId;
+
+        /// <summary>Normalized MediaBox corners (x0 &lt;= x1, y0 &lt;= y1) in the source page's user space.</summary>
+        internal float BoxX0, BoxY0, BoxX1, BoxY1;
+
+        /// <summary>The page's /Rotate value normalized to 0, 90, 180, or 270.</summary>
+        internal int Rotate;
+    }
+
+    /// <summary>
+    /// Affine transform mapping stamped (viewed-page) coordinates into an imported page's
+    /// unrotated PDF user space. Compensates for a non-zero MediaBox origin and the page
+    /// /Rotate value so stamped content appears upright at the expected position when the
+    /// viewer applies the rotation.
+    /// </summary>
+    internal struct StampTransform
+    {
+        internal float A, B, C, D, E, F;
+
+        internal bool IsIdentity => A == 1 && B == 0 && C == 0 && D == 1 && E == 0 && F == 0;
+
+        internal static readonly StampTransform Identity = new StampTransform { A = 1, D = 1 };
+
+        internal static StampTransform For(ImportedPageContent content)
+        {
+            float x0 = content.BoxX0, y0 = content.BoxY0, x1 = content.BoxX1, y1 = content.BoxY1;
+            switch (content.Rotate)
+            {
+                // /Rotate rotates the page clockwise for display; content is pre-rotated the
+                // other way so it reads upright. Derived by mapping the viewed page's corners
+                // onto the MediaBox rectangle.
+                case 90: return new StampTransform { B = 1, C = -1, E = x1, F = y0 };
+                case 180: return new StampTransform { A = -1, D = -1, E = x1, F = y1 };
+                case 270: return new StampTransform { B = -1, C = 1, E = x0, F = y1 };
+                default: return new StampTransform { A = 1, D = 1, E = x0, F = y0 };
+            }
+        }
+
+        internal void Apply(float x, float y, out float tx, out float ty)
+        {
+            tx = A * x + C * y + E;
+            ty = B * x + D * y + F;
+        }
     }
 
     /// <summary>
@@ -114,12 +157,55 @@ namespace SimpleTinyPDF
             if (annots != null && annots.Items.Count > 0)
                 pageDict.Set("Annots", annots);
 
-            return new ImportedPageContent
+            var content = new ImportedPageContent
             {
                 Context = context,
                 PageDict = pageDict,
                 SourcePageId = record.Id,
             };
+            ReadBoxAndRotation(source, record, content);
+            return content;
+        }
+
+        /// <summary>
+        /// Records the page's normalized MediaBox corners and /Rotate value on the payload
+        /// so stamped content and annotations can be positioned in viewed-page coordinates.
+        /// Falls back to Letter size when the box is absent or degenerate, matching the
+        /// fallback MediaBox written by <see cref="Import"/>.
+        /// </summary>
+        private static void ReadBoxAndRotation(PdfReadDocument source, ReadPageRecord record,
+            ImportedPageContent content)
+        {
+            content.BoxX0 = 0;
+            content.BoxY0 = 0;
+            content.BoxX1 = PageSize.Letter.Width;
+            content.BoxY1 = PageSize.Letter.Height;
+            var box = record.MediaBox;
+            if (box != null && box.Items.Count >= 4)
+            {
+                float x0 = ToFloat(source.Resolve(box.Items[0]));
+                float y0 = ToFloat(source.Resolve(box.Items[1]));
+                float x1 = ToFloat(source.Resolve(box.Items[2]));
+                float y1 = ToFloat(source.Resolve(box.Items[3]));
+                if (x0 != x1 && y0 != y1)
+                {
+                    content.BoxX0 = Math.Min(x0, x1);
+                    content.BoxY0 = Math.Min(y0, y1);
+                    content.BoxX1 = Math.Max(x0, x1);
+                    content.BoxY1 = Math.Max(y0, y1);
+                }
+            }
+
+            long rotate = record.Rotate ?? 0;
+            rotate = (rotate % 360 + 360) % 360;
+            content.Rotate = rotate == 90 || rotate == 180 || rotate == 270 ? (int)rotate : 0;
+        }
+
+        private static float ToFloat(CosValue value)
+        {
+            if (value is CosInteger i) return i.Value;
+            if (value is CosReal r) return (float)r.Value;
+            return 0;
         }
 
         /// <summary>
